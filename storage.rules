@@ -1,0 +1,16 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+    // Guests upload directly from the browser (no server relay) into their
+    // board's own folder. Same trust model as the Firestore photos
+    // collection: no auth, but capped size/type so a stray upload can't
+    // blow through the free-tier storage allowance on its own.
+    match /boards/{boardId}/photos/{fileName} {
+      allow read: if true;
+      allow write: if request.resource.size < 15 * 1024 * 1024
+                   && request.resource.contentType.matches('image/.*');
+      allow delete: if false;
+    }
+  }
+}

@@ -1,0 +1,49 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Public: anyone with the board id or room code can read it (guests
+    // need this to join). Created and ended only via server API routes
+    // using the Admin SDK, which bypasses these rules entirely - so no
+    // client create/update/delete path is needed here at all.
+    match /boards/{boardId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    // No client access whatsoever - only the Admin SDK (server API routes)
+    // ever touches this collection. See lib/hostAuth.ts.
+    match /boardSecrets/{boardId} {
+      allow read, write: if false;
+    }
+
+    // Guests never log in, so there's no auth check here - anyone who
+    // knows a boardId can add a photo to it, same trust model as knowing
+    // the room code/QR at all. Field shape is validated so a malformed
+    // write can't corrupt what every other guest reads.
+    match /photos/{photoId} {
+      allow read: if true;
+
+      allow create: if request.resource.data.keys().hasAll(
+                        ['boardId', 'storagePath', 'downloadUrl', 'caption',
+                         'contributorName', 'contributorGuestId', 'uploadedAt', 'reactedBy']
+                      )
+                    && request.resource.data.boardId is string
+                    && request.resource.data.caption is string
+                    && request.resource.data.caption.size() <= 280
+                    && request.resource.data.contributorName is string
+                    && request.resource.data.contributorName.size() <= 40
+                    && request.resource.data.reactedBy == {};
+
+      // Guests have no real identity (no Firebase Auth), just a
+      // client-generated id in localStorage - so this can't cryptographically
+      // guarantee a guest only edits their own entry, only that reactedBy is
+      // the sole field anyone is ever allowed to touch after creation. That's
+      // the honest boundary available without adding a full auth system.
+      allow update: if request.resource.data.diff(resource.data).affectedKeys().hasOnly(['reactedBy']);
+
+      allow delete: if false;
+    }
+  }
+}
