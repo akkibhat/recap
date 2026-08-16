@@ -26,7 +26,7 @@ export async function GET(req: NextRequest) {
       throw new Error("Google did not return a refresh token.");
     }
 
-    const album = await createAlbum(accessToken, board.title);
+    const album = await createAlbum(accessToken, `Recap - ${board.title}`);
 
     await adminDb.runTransaction(async (tx) => {
       tx.update(adminDb.collection("boardSecrets").doc(boardId), {
