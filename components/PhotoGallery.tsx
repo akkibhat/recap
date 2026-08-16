@@ -12,7 +12,12 @@ const EMOJI_GLYPH: Record<ReactionEmoji, string> = {
 
 export function PhotoGallery({ photos, guestId }: { photos: Photo[]; guestId: string }) {
   if (photos.length === 0) {
-    return <p className="py-12 text-center text-sm text-zinc-500">No memories yet — be the first to add one.</p>;
+    return (
+      <div className="border border-dashed border-line py-16 text-center">
+        <p className="text-sm text-bone-dim">Nothing developed yet</p>
+        <p className="mt-1 text-xs text-bone-faint">First photo of the night goes here</p>
+      </div>
+    );
   }
 
   return (
@@ -29,23 +34,30 @@ function PhotoCard({ photo, guestId }: { photo: Photo; guestId: string }) {
   const myReaction = photo.reactedBy[guestId];
 
   return (
-    <div className="flex flex-col overflow-hidden rounded-xl border border-zinc-200 dark:border-zinc-800">
+    <div className="flex flex-col border border-line bg-surface">
       {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={photo.downloadUrl} alt={photo.caption || "Party photo"} className="aspect-square w-full object-cover" />
-      <div className="flex flex-col gap-1.5 p-2">
-        {photo.caption && <p className="text-xs text-zinc-700 dark:text-zinc-300">{photo.caption}</p>}
-        <p className="text-[11px] text-zinc-400">{photo.contributorName}</p>
+      <img
+        src={photo.downloadUrl}
+        alt={photo.caption || "Party photo"}
+        className="aspect-square w-full object-cover"
+      />
+      <div className="flex flex-col gap-2 p-2.5">
+        {photo.caption && <p className="text-xs leading-relaxed text-bone">{photo.caption}</p>}
+        <p className="text-[11px] uppercase tracking-wider text-bone-faint">{photo.contributorName}</p>
         <div className="flex gap-1">
           {REACTION_EMOJIS.map((emoji) => (
             <button
               key={emoji}
               onClick={() => setReaction(photo.id, guestId, emoji, myReaction)}
-              className={`flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-xs ${
-                myReaction === emoji ? "bg-zinc-900 text-white dark:bg-white dark:text-zinc-900" : "bg-zinc-100 dark:bg-zinc-800"
+              aria-label={`React ${emoji}`}
+              className={`flex min-w-9 items-center justify-center gap-1 border px-1.5 py-1.5 text-xs transition-transform active:scale-90 ${
+                myReaction === emoji
+                  ? "border-safelight bg-safelight/15 text-safelight"
+                  : "border-line text-bone-dim hover:border-line-bright"
               }`}
             >
               <span>{EMOJI_GLYPH[emoji]}</span>
-              {counts[emoji] > 0 && <span>{counts[emoji]}</span>}
+              {counts[emoji] > 0 && <span className="tabular-nums">{counts[emoji]}</span>}
             </button>
           ))}
         </div>

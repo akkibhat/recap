@@ -9,6 +9,14 @@ import { getOrCreateGuestId, getGuestName, setGuestName } from "@/lib/guestIdent
 import { postJson } from "@/lib/api";
 import { PhotoGallery } from "@/components/PhotoGallery";
 import { PhotoUploadForm } from "@/components/PhotoUploadForm";
+import { LogoMark, Wordmark } from "@/components/Logo";
+import {
+  inputClass,
+  buttonPrimaryClass,
+  buttonSecondaryClass,
+  buttonDangerClass,
+  labelClass,
+} from "@/components/ui";
 
 export function HostBoardClient({ boardId }: { boardId: string }) {
   const { data: board, loading } = useBoardById(boardId);
@@ -34,7 +42,16 @@ export function HostBoardClient({ boardId }: { boardId: string }) {
   useEffect(() => {
     if (!board) return;
     const joinUrl = `${window.location.origin}/join/${board.roomCode}`;
-    QRCode.toDataURL(joinUrl, { width: 240, margin: 1 }).then(setQrDataUrl);
+    // Deliberately standard polarity (dark modules on a light background).
+    // Inverted QR codes read fine on most modern phones but fail on some
+    // scanners, and a guest who can't scan can't join - not worth the risk
+    // for a nicer-looking code. It's framed as a bone "print" below, which
+    // suits the darkroom theme anyway.
+    QRCode.toDataURL(joinUrl, {
+      width: 240,
+      margin: 1,
+      color: { dark: "#0a0a0a", light: "#ededed" },
+    }).then(setQrDataUrl);
   }, [board]);
 
   async function handleEnd() {
@@ -68,19 +85,22 @@ export function HostBoardClient({ boardId }: { boardId: string }) {
   }
 
   if (loading || !guestId) {
-    return <div className="flex flex-1 items-center justify-center text-sm text-zinc-500">Loading…</div>;
+    return <div className="flex flex-1 items-center justify-center text-sm text-bone-dim">Loading…</div>;
   }
 
   if (!board) {
-    return <div className="flex flex-1 items-center justify-center text-sm text-zinc-500">Board not found.</div>;
+    return <div className="flex flex-1 items-center justify-center text-sm text-bone-dim">Board not found.</div>;
   }
 
   if (!hostKey) {
     return (
-      <div className="flex flex-1 flex-col items-center justify-center gap-2 px-6 text-center">
+      <div className="flex flex-1 flex-col items-center justify-center gap-3 px-6 text-center">
+        <span className="text-bone-faint">
+          <LogoMark size={32} />
+        </span>
         <p className="text-lg font-medium">You&apos;re not the host of this board</p>
-        <p className="text-sm text-zinc-500">
-          Join with the room code instead: <span className="font-mono">{board.roomCode}</span>
+        <p className="text-sm text-bone-dim">
+          Join with the room code instead: <span className="text-safelight">{board.roomCode}</span>
         </p>
       </div>
     );
@@ -88,52 +108,55 @@ export function HostBoardClient({ boardId }: { boardId: string }) {
 
   return (
     <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-6 px-4 py-6">
-      <div className="flex flex-col items-center gap-3 text-center">
-        <h1 className="text-2xl font-semibold">{board.title}</h1>
-        {board.endedAt ? (
-          <p className="text-sm text-zinc-500">This board has ended.</p>
-        ) : (
-          <>
-            {qrDataUrl && (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={qrDataUrl} alt="QR code to join" className="rounded-lg" />
-            )}
-            <p className="text-3xl font-mono font-semibold tracking-widest">{board.roomCode}</p>
-            <p className="text-sm text-zinc-500">Guests scan the code or go to /join/{board.roomCode}</p>
-
-            {board.googlePhotosConnected ? (
-              <p className="text-sm text-green-600">
-                Google Photos connected — photos archive there when you end the board.
-              </p>
-            ) : (
-              <button
-                onClick={handleConnectGooglePhotos}
-                disabled={connecting}
-                className="text-sm font-medium underline disabled:opacity-40"
-              >
-                {connecting ? "Connecting…" : "Connect Google Photos (optional)"}
-              </button>
-            )}
-
-            <div className="mt-2 flex gap-3">
-              <a
-                href={`/api/boards/${boardId}/export?hostKey=${hostKey}`}
-                className="rounded-lg border border-zinc-300 px-4 py-2 text-sm font-medium dark:border-zinc-700"
-              >
-                Download all as zip
-              </a>
-              <button
-                onClick={handleEnd}
-                disabled={ending}
-                className="rounded-lg border border-red-300 px-4 py-2 text-sm font-medium text-red-600 disabled:opacity-40 dark:border-red-900"
-              >
-                {ending ? "Ending…" : "End board"}
-              </button>
-            </div>
-            {error && <p className="text-sm text-red-600">{error}</p>}
-          </>
-        )}
+      <div className="flex items-center justify-between border-b border-line pb-4">
+        <h1 className="text-xl font-medium tracking-tight">{board.title}</h1>
+        <Wordmark size={18} />
       </div>
+
+      {board.endedAt ? (
+        <p className="py-8 text-center text-sm text-bone-dim">This board has ended.</p>
+      ) : (
+        <div className="flex flex-col items-center gap-4 border border-line bg-surface p-6">
+          {qrDataUrl && (
+            <div className="bg-bone p-3">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={qrDataUrl} alt="QR code to join" className="block" />
+            </div>
+          )}
+          <div className="text-center">
+            <p className={labelClass}>Room code</p>
+            <p className="mt-1 text-4xl font-medium tracking-[0.3em] text-safelight">{board.roomCode}</p>
+          </div>
+          <p className="text-xs text-bone-faint">Scan, or go to /join/{board.roomCode}</p>
+
+          {board.googlePhotosConnected ? (
+            <p className="text-xs text-bone-dim">
+              Google Photos connected — photos archive there when you end the board.
+            </p>
+          ) : (
+            <button
+              onClick={handleConnectGooglePhotos}
+              disabled={connecting}
+              className="text-xs text-bone-dim underline underline-offset-4 hover:text-bone disabled:opacity-30"
+            >
+              {connecting ? "Connecting…" : "Connect Google Photos (optional)"}
+            </button>
+          )}
+
+          <div className="flex w-full flex-col gap-2 border-t border-line pt-4 sm:flex-row sm:justify-center">
+            <a
+              href={`/api/boards/${boardId}/export?hostKey=${hostKey}`}
+              className={`${buttonSecondaryClass} text-center`}
+            >
+              Download all as zip
+            </a>
+            <button onClick={handleEnd} disabled={ending} className={buttonDangerClass}>
+              {ending ? "Ending…" : "End board"}
+            </button>
+          </div>
+          {error && <p className="text-sm text-safelight">{error}</p>}
+        </div>
+      )}
 
       {!board.endedAt &&
         (guestName ? (
@@ -153,13 +176,9 @@ export function HostBoardClient({ boardId }: { boardId: string }) {
               onChange={(e) => setNameDraft(e.target.value)}
               placeholder="Your name, to add your own photos"
               maxLength={40}
-              className="flex-1 rounded-lg border border-zinc-300 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+              className={inputClass}
             />
-            <button
-              type="submit"
-              disabled={!nameDraft.trim()}
-              className="rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-40 dark:bg-white dark:text-zinc-900"
-            >
+            <button type="submit" disabled={!nameDraft.trim()} className={buttonPrimaryClass}>
               Set
             </button>
           </form>

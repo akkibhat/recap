@@ -6,6 +6,8 @@ import { usePhotos } from "@/lib/hooks/usePhotos";
 import { getOrCreateGuestId, getGuestName, setGuestName } from "@/lib/guestIdentity";
 import { PhotoUploadForm } from "@/components/PhotoUploadForm";
 import { PhotoGallery } from "@/components/PhotoGallery";
+import { LogoMark, Wordmark } from "@/components/Logo";
+import { inputClass, buttonPrimaryClass, labelClass } from "@/components/ui";
 
 export function JoinBoardClient({ roomCode }: { roomCode: string }) {
   // localStorage isn't available during SSR, so these resolve to null/empty
@@ -21,25 +23,17 @@ export function JoinBoardClient({ roomCode }: { roomCode: string }) {
   const { data: photos } = usePhotos(board?.id ?? null);
 
   if (loading || !guestId) {
-    return <div className="flex flex-1 items-center justify-center text-sm text-zinc-500">Loading…</div>;
+    return <CentredMessage title="Loading…" />;
   }
 
   if (!board) {
     return (
-      <div className="flex flex-1 flex-col items-center justify-center gap-2 px-6 text-center">
-        <p className="text-lg font-medium">Board not found</p>
-        <p className="text-sm text-zinc-500">Double check the room code — it&apos;s {roomCode}.</p>
-      </div>
+      <CentredMessage title="No board with that code" detail={`Double check it — you tried ${roomCode}.`} />
     );
   }
 
   if (board.endedAt) {
-    return (
-      <div className="flex flex-1 flex-col items-center justify-center gap-2 px-6 text-center">
-        <p className="text-lg font-medium">{board.title}</p>
-        <p className="text-sm text-zinc-500">This board has ended.</p>
-      </div>
-    );
+    return <CentredMessage title={board.title} detail="This board has ended." />;
   }
 
   if (!guestName) {
@@ -48,9 +42,24 @@ export function JoinBoardClient({ roomCode }: { roomCode: string }) {
 
   return (
     <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-5 px-4 py-6">
-      <h1 className="text-2xl font-semibold">{board.title}</h1>
+      <div className="flex items-center justify-between border-b border-line pb-4">
+        <h1 className="text-xl font-medium tracking-tight">{board.title}</h1>
+        <Wordmark size={18} />
+      </div>
       <PhotoUploadForm boardId={board.id} guestId={guestId} guestName={guestName} />
       <PhotoGallery photos={photos} guestId={guestId} />
+    </div>
+  );
+}
+
+function CentredMessage({ title, detail }: { title: string; detail?: string }) {
+  return (
+    <div className="flex flex-1 flex-col items-center justify-center gap-3 px-6 text-center">
+      <span className="text-bone-faint">
+        <LogoMark size={32} />
+      </span>
+      <p className="text-lg font-medium">{title}</p>
+      {detail && <p className="text-sm text-bone-dim">{detail}</p>}
     </div>
   );
 }
@@ -66,10 +75,13 @@ function NamePrompt({ boardTitle, onSet }: { boardTitle: string; onSet: (name: s
   }
 
   return (
-    <div className="flex flex-1 flex-col items-center justify-center gap-4 px-6 text-center">
-      <div>
-        <p className="text-sm text-zinc-500">Joining</p>
-        <h1 className="text-2xl font-semibold">{boardTitle}</h1>
+    <div className="flex flex-1 flex-col items-center justify-center gap-6 px-6">
+      <div className="flex flex-col items-center gap-3 text-center">
+        <span className="text-bone">
+          <LogoMark size={36} />
+        </span>
+        <p className={labelClass}>Joining</p>
+        <h1 className="text-2xl font-medium tracking-tight">{boardTitle}</h1>
       </div>
       <form onSubmit={handleSubmit} className="flex w-full max-w-xs flex-col gap-3">
         <input
@@ -78,13 +90,9 @@ function NamePrompt({ boardTitle, onSet }: { boardTitle: string; onSet: (name: s
           onChange={(e) => setName(e.target.value)}
           placeholder="Your name"
           maxLength={40}
-          className="rounded-lg border border-zinc-300 px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-zinc-900 dark:border-zinc-700 dark:bg-zinc-900"
+          className={inputClass}
         />
-        <button
-          type="submit"
-          disabled={!name.trim()}
-          className="rounded-lg bg-zinc-900 px-4 py-3 font-medium text-white disabled:opacity-40 dark:bg-white dark:text-zinc-900"
-        >
+        <button type="submit" disabled={!name.trim()} className={buttonPrimaryClass}>
           Join
         </button>
       </form>

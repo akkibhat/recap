@@ -2,6 +2,7 @@
 
 import { useRef, useState } from "react";
 import { uploadPhoto } from "@/lib/uploadPhoto";
+import { inputClass, buttonPrimaryClass } from "@/components/ui";
 
 export function PhotoUploadForm({
   boardId,
@@ -44,22 +45,22 @@ export function PhotoUploadForm({
   }
 
   return (
-    <form
-      onSubmit={handleSubmit}
-      className="flex flex-col gap-3 rounded-xl border border-zinc-200 p-4 dark:border-zinc-800"
-    >
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept="image/*"
-        capture="environment"
-        onChange={handleFileChange}
-        className="text-sm"
-      />
+    <form onSubmit={handleSubmit} className="flex flex-col gap-3 border border-line bg-surface p-4">
+      <label className="flex cursor-pointer items-center justify-center border border-dashed border-line-bright px-4 py-6 text-sm text-bone-dim hover:border-bone hover:text-bone">
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          capture="environment"
+          onChange={handleFileChange}
+          className="sr-only"
+        />
+        {file ? file.name : "Choose a photo"}
+      </label>
 
       {previewUrl && (
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={previewUrl} alt="Preview" className="max-h-48 rounded-lg object-cover" />
+        <img src={previewUrl} alt="Preview" className="max-h-52 w-full border border-line object-cover" />
       )}
 
       <input
@@ -67,17 +68,13 @@ export function PhotoUploadForm({
         onChange={(e) => setCaption(e.target.value)}
         placeholder="Add a caption (optional)"
         maxLength={280}
-        className="rounded-lg border border-zinc-300 px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+        className={inputClass}
       />
 
-      <button
-        type="submit"
-        disabled={!file || uploading}
-        className="rounded-lg bg-zinc-900 px-4 py-2.5 text-sm font-medium text-white disabled:opacity-40 dark:bg-white dark:text-zinc-900"
-      >
-        {uploading ? "Adding…" : "Add to the board"}
+      <button type="submit" disabled={!file || uploading} className={buttonPrimaryClass}>
+        {uploading ? "Developing…" : "Add to the board"}
       </button>
-      {error && <p className="text-sm text-red-600">{error}</p>}
+      {error && <p className="text-sm text-safelight">{error}</p>}
     </form>
   );
 }
