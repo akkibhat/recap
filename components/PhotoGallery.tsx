@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Photo, REACTION_EMOJIS, reactionCounts, ReactionEmoji } from "@/lib/types/photo";
+import { REACTION_EMOJIS, reactionCounts, ReactionEmoji } from "@/lib/types/photo";
+import type { RollPhoto } from "@/lib/hooks/usePhotos";
 import { setReaction } from "@/lib/setReaction";
 import { deleteOwnPhoto } from "@/lib/deletePhoto";
 import { deleteJson } from "@/lib/api";
@@ -17,15 +18,6 @@ const EMOJI_GLYPH: Record<ReactionEmoji, string> = {
 // app's layout.
 const TWO_COLUMN_QUERY = "(min-width: 40rem)";
 
-type Frame = { photo: Photo; number: string };
-
-// Edge printing, as found along the rebate of a developed negative. Real 35mm
-// alternates plain and "A"-suffixed numbers between the sprockets; a single
-// consistent suffix reads the same at a glance and can't be misread as two
-// different frames.
-function frameNumber(index: number): string {
-  return `${String(index + 1).padStart(2, "0")}A`;
-}
 
 // One strip on a phone, two once there's room, and deliberately never three.
 //
@@ -72,8 +64,8 @@ function useColumnCount(): number {
 // before starting the next. Every frame is the same height, so rotation keeps
 // the strips level without measuring anything, and it also means reading the
 // top row left to right gives you the most recent photos.
-function dealIntoColumns(frames: Frame[], columnCount: number): Frame[][] {
-  const columns: Frame[][] = Array.from({ length: columnCount }, () => []);
+function dealIntoColumns(frames: RollPhoto[], columnCount: number): RollPhoto[][] {
+  const columns: RollPhoto[][] = Array.from({ length: columnCount }, () => []);
   frames.forEach((frame, index) => columns[index % columnCount].push(frame));
   // A board with fewer photos than columns would otherwise render empty strips
   // of bare sprockets alongside the real one.
@@ -88,7 +80,7 @@ export function PhotoGallery({
   // moderation - the ability to remove someone else's photo, not just your own.
   hostKey,
 }: {
-  photos: Photo[];
+  photos: RollPhoto[];
   guestId: string;
   boardId: string;
   hostKey?: string | null;
@@ -104,14 +96,10 @@ export function PhotoGallery({
     );
   }
 
-  // `photos` arrives oldest-first, which is the order the roll was actually
-  // shot in - so a photo's index IS its frame number. Number before reversing,
-  // otherwise the newest photo would come out as frame 1.
-  const frames: Frame[] = photos.map((photo, index) => ({
-    photo,
-    number: frameNumber(index),
-  }));
-  frames.reverse();
+  // Frame numbers already came off the roll in usePhotos, assigned from the
+  // unfiltered upload order so deletions can't shift them. All that's left is
+  // to show the newest first.
+  const frames = [...photos].reverse();
 
   return (
     <div className="flex gap-3">
@@ -139,7 +127,7 @@ function FilmStrip({
   boardId,
   hostKey,
 }: {
-  frames: Frame[];
+  frames: RollPhoto[];
   guestId: string;
   boardId: string;
   hostKey?: string | null;
@@ -148,11 +136,10 @@ function FilmStrip({
     <div className="flex min-w-0 flex-1 bg-frame">
       <div className="sprocket-column" />
       <div className="min-w-0 flex-1 py-1.5">
-        {frames.map(({ photo, number }) => (
+        {frames.map((photo) => (
           <PhotoFrame
             key={photo.id}
             photo={photo}
-            number={number}
             guestId={guestId}
             boardId={boardId}
             hostKey={hostKey}
@@ -166,13 +153,11 @@ function FilmStrip({
 
 function PhotoFrame({
   photo,
-  number,
   guestId,
   boardId,
   hostKey,
 }: {
-  photo: Photo;
-  number: string;
+  photo: RollPhoto;
   guestId: string;
   boardId: string;
   hostKey?: string | null;
@@ -187,9 +172,14 @@ function PhotoFrame({
   const canRemove = isMine || Boolean(hostKey);
 
   async function handleRemove() {
-    if (!confirm(isMine ? "Remove your photo from the roll?" : "Remove this photo from the roll?")) {
-      return;
-    }
+    // Says out loud that removal takes a photo off the board but doesn't
+    // guarantee the host discards it - they review deleted frames when the
+    // board ends and may keep them. Deleting is soft by design, so promising
+    // anything stronger here would be a lie.
+    const warning = isMine
+      ? "Take your photo off the roll? The host still sees it when they develop the roll, and can choose to keep it."
+      : "Take this photo off the roll? You'll still see it when you develop the roll.";
+    if (!confirm(warning)) return;
     setRemoving(true);
     try {
       if (isMine) {
@@ -220,7 +210,7 @@ function PhotoFrame({
       {photo.caption && <p className="pt-1.5 text-xs leading-snug text-bone">{photo.caption}</p>}
 
       <p className="truncate pt-1.5 font-mono text-[11px] tracking-widest text-edge uppercase">
-        {number} {photo.contributorName}
+        {photo.frameNumber} {photo.contributorName}
       </p>
 
       {/* On its own row rather than sharing the edge-printing line: a strip is
