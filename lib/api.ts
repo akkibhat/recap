@@ -29,8 +29,19 @@ export async function postJson<T>(url: string, body: unknown, hostKey?: string):
   return data as T;
 }
 
-export async function deleteJson<T>(url: string, hostKey?: string): Promise<T> {
-  const res = await fetch(url, { method: "DELETE", headers: await hostHeaders(hostKey) });
+// `body` is optional because most deletes identify their target entirely in
+// the URL. Board deletion is the exception: it carries a typed confirmation,
+// which belongs in the body rather than a query string so it stays out of
+// server logs and browser history.
+export async function deleteJson<T>(url: string, hostKey?: string, body?: unknown): Promise<T> {
+  const res = await fetch(url, {
+    method: "DELETE",
+    headers: {
+      ...(body === undefined ? {} : { "Content-Type": "application/json" }),
+      ...(await hostHeaders(hostKey)),
+    },
+    ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+  });
 
   const data = await res.json();
   if (!res.ok) throw new Error(data.error ?? `Request failed (${res.status})`);
