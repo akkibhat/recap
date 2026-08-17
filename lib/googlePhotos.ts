@@ -78,14 +78,18 @@ export async function addPhotoToAlbum(
   accessToken: string,
   albumId: string,
   imageBytes: Buffer,
-  filename: string
+  filename: string,
+  // Google rejects the upload if this doesn't match the bytes, so it has to be
+  // the type recorded at upload rather than a hardcoded guess. Videos were
+  // silently impossible while this said image/jpeg.
+  contentType: string
 ): Promise<void> {
   const uploadRes = await fetch("https://photoslibrary.googleapis.com/v1/uploads", {
     method: "POST",
     headers: {
       Authorization: `Bearer ${accessToken}`,
       "Content-Type": "application/octet-stream",
-      "X-Goog-Upload-Content-Type": "image/jpeg",
+      "X-Goog-Upload-Content-Type": contentType,
       "X-Goog-Upload-Protocol": "raw",
     },
     body: new Uint8Array(imageBytes),

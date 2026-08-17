@@ -4,12 +4,23 @@ service firebase.storage {
   match /b/{bucket}/o {
     // Guests upload directly from the browser (no server relay) into their
     // board's own folder. Same trust model as the Firestore photos
-    // collection: no auth, but capped size/type so a stray upload can't
+    // subcollection: no auth, but capped size/type so a stray upload can't
     // blow through the free-tier storage allowance on its own.
+    //
+    // Videos get a larger cap than photos because they need one - a 30-second
+    // 1080p clip off a phone is tens of megabytes, so the 15MB photo limit
+    // would reject almost every real video. 50MB is the compromise: long
+    // enough for the clips people actually take at a party, small enough that
+    // the 5GB free tier isn't gone in a handful of uploads.
     match /boards/{boardId}/photos/{fileName} {
       allow read: if true;
-      allow write: if request.resource.size < 15 * 1024 * 1024
-                   && request.resource.contentType.matches('image/.*');
+      allow write: if (
+                     request.resource.contentType.matches('image/.*')
+                     && request.resource.size < 15 * 1024 * 1024
+                   ) || (
+                     request.resource.contentType.matches('video/.*')
+                     && request.resource.size < 50 * 1024 * 1024
+                   );
       allow delete: if false;
     }
   }

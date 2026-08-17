@@ -15,6 +15,13 @@ export type Photo = {
   // a missing thumbnail costs bandwidth, never a broken frame.
   thumbPath: string | null;
   thumbUrl: string | null;
+  // The uploaded file's MIME type. Stored rather than guessed from the file
+  // extension because the Google Photos upload needs it verbatim, and because
+  // it's what decides whether a frame renders as an image or a video.
+  contentType: string;
+  // Videos only. Null for photos, and also null for a video whose metadata the
+  // browser never delivered.
+  durationSeconds: number | null;
   caption: string;
   contributorName: string;
   contributorGuestId: string;
@@ -42,6 +49,13 @@ export function newPhotoFields(input: {
   // a missing thumbnail costs bandwidth, never a broken frame.
   thumbPath: string | null;
   thumbUrl: string | null;
+  // The uploaded file's MIME type. Stored rather than guessed from the file
+  // extension because the Google Photos upload needs it verbatim, and because
+  // it's what decides whether a frame renders as an image or a video.
+  contentType: string;
+  // Videos only. Null for photos, and also null for a video whose metadata the
+  // browser never delivered.
+  durationSeconds: number | null;
   caption: string;
   contributorName: string;
   contributorGuestId: string;
@@ -51,6 +65,8 @@ export function newPhotoFields(input: {
     downloadUrl: input.downloadUrl,
     thumbPath: input.thumbPath,
     thumbUrl: input.thumbUrl,
+    contentType: input.contentType,
+    durationSeconds: input.durationSeconds,
     caption: input.caption,
     contributorName: input.contributorName,
     contributorGuestId: input.contributorGuestId,
@@ -69,6 +85,9 @@ export function normalisePhoto(id: string, data: Partial<Photo>): Photo {
     downloadUrl: data.downloadUrl ?? "",
     thumbPath: data.thumbPath ?? null,
     thumbUrl: data.thumbUrl ?? null,
+    // Anything uploaded before videos existed is an image by definition.
+    contentType: data.contentType ?? "image/jpeg",
+    durationSeconds: data.durationSeconds ?? null,
     caption: data.caption ?? "",
     contributorName: data.contributorName ?? "Someone",
     contributorGuestId: data.contributorGuestId ?? "",
@@ -95,6 +114,17 @@ export function reactionCounts(photo: Photo): Record<ReactionEmoji, number> {
     counts[emoji]++;
   }
   return counts;
+}
+
+export function isVideo(photo: Photo): boolean {
+  return photo.contentType.startsWith("video/");
+}
+
+// mm:ss for the badge on a video frame.
+export function formatDuration(seconds: number): string {
+  const mins = Math.floor(seconds / 60);
+  const secs = seconds % 60;
+  return `${mins}:${String(secs).padStart(2, "0")}`;
 }
 
 // What the gallery should load for a frame. Photos uploaded before thumbnails

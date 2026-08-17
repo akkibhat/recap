@@ -66,7 +66,7 @@ export async function archiveBoardToGooglePhotos(boardId: string): Promise<Archi
     const [bytes] = await bucket.file(photo.storagePath).download();
     const filename = photo.storagePath.split("/").pop() ?? `${photo.id}.jpg`;
 
-    await addPhotoToAlbum(accessToken, album.id, bytes, filename);
+    await addPhotoToAlbum(accessToken, album.id, bytes, filename, photo.contentType);
     uploadedPaths.push(photo.storagePath);
     if (photo.thumbPath) uploadedPaths.push(photo.thumbPath);
   }

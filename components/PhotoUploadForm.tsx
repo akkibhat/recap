@@ -113,24 +113,36 @@ export function PhotoUploadForm({
         <input
           ref={fileInputRef}
           type="file"
-          accept="image/*"
+          accept="image/*,video/*"
           multiple
           onChange={handleFileChange}
           className="sr-only"
         />
-        {pending.length > 0 ? "Add more photos" : "Choose photos"}
+        {pending.length > 0 ? "Add more" : "Choose photos or video"}
       </label>
 
       {pending.length > 0 && (
         <div className="flex flex-col gap-3">
           {pending.map((item) => (
             <div key={item.id} className="flex gap-3 border border-line p-2">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={item.previewUrl}
-                alt=""
-                className="size-20 shrink-0 border border-line object-cover"
-              />
+              {/* A video can't be previewed with an img tag - it would render
+                  as a broken image rather than its first frame. */}
+              {item.file.type.startsWith("video/") ? (
+                <video
+                  src={item.previewUrl}
+                  muted
+                  playsInline
+                  preload="metadata"
+                  className="size-20 shrink-0 border border-line object-cover"
+                />
+              ) : (
+                /* eslint-disable-next-line @next/next/no-img-element */
+                <img
+                  src={item.previewUrl}
+                  alt=""
+                  className="size-20 shrink-0 border border-line object-cover"
+                />
+              )}
               <div className="flex min-w-0 flex-1 flex-col gap-2">
                 <input
                   value={item.caption}

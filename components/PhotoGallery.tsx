@@ -1,7 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { REACTION_EMOJIS, reactionCounts, galleryUrl, ReactionEmoji } from "@/lib/types/photo";
+import {
+  REACTION_EMOJIS,
+  reactionCounts,
+  galleryUrl,
+  isVideo,
+  formatDuration,
+  ReactionEmoji,
+} from "@/lib/types/photo";
 import type { RollPhoto } from "@/lib/hooks/usePhotos";
 import type { Comment } from "@/lib/types/comment";
 import { setReaction } from "@/lib/setReaction";
@@ -330,13 +337,24 @@ function PhotoFrame({
           aria-label={`Open frame ${photo.frameNumber} by ${photo.contributorName}`}
           className="block w-full"
         >
+          {/* Even a video shows a still here: the poster frame extracted at
+              upload, or the video file itself as a fallback, which browsers
+              render as its first frame. A strip of autoplaying clips would be
+              unreadable and would pull the whole board over the wire. */}
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={galleryUrl(photo)}
-            alt={photo.caption || "Party photo"}
+            alt={photo.caption || (isVideo(photo) ? "Party video" : "Party photo")}
             loading="lazy"
             className="aspect-2/3 w-full object-cover"
           />
+
+          {isVideo(photo) && (
+            <span className="pointer-events-none absolute bottom-1 left-1 flex items-center gap-1 bg-ink/70 px-1.5 py-0.5 font-mono text-[11px] text-bone">
+              <span aria-hidden="true">▶</span>
+              {photo.durationSeconds !== null && formatDuration(photo.durationSeconds)}
+            </span>
+          )}
         </button>
 
         {/* Sits on the photo rather than in the reactions row. A destructive

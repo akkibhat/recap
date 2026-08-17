@@ -44,10 +44,11 @@ service cloud.firestore {
         // No boardId in this list any more: the path is the only record of
         // which board a photo belongs to, so the two can never disagree.
         allow create: if request.resource.data.keys().hasAll(
-                          ['storagePath', 'downloadUrl', 'caption',
+                          ['storagePath', 'downloadUrl', 'contentType', 'caption',
                            'contributorName', 'contributorGuestId', 'uploadedAt', 'reactedBy']
                         )
                       && request.resource.data.storagePath is string
+                      && request.resource.data.contentType is string
                       && request.resource.data.caption is string
                       && request.resource.data.caption.size() <= 280
                       && request.resource.data.contributorName is string
@@ -60,22 +61,23 @@ service cloud.firestore {
         // the sole field anyone is ever allowed to touch after creation. That's
         // the honest boundary available without adding a full auth system.
         //
-        // Second clause is a guest deleting their own photo: the claimed
-        // deleter must match the recorded contributor, so a client can't
-        // casually remove someone else's. Since both are the same spoofable
-        // localStorage id that's a speed bump, not a guarantee - it's only safe
-        // because deletion is soft. This write hides a photo, never destroys
-        // one. The host's moderation goes through an API route with the host
-        // key, which the Admin SDK enforces properly.
+        // Clause 2 is the uploader editing their own caption. Like the delete
+        // clauses it validates shape but cannot verify WHO is editing - there
+        // is no guest auth, and contributorGuestId is readable by anyone who
+        // can read the photo. One asymmetry is worth naming: a delete can be
+        // undone, an edit overwrites the previous text.
         //
-        // Third clause is undo, permitted only when the photo was removed by
-        // its own contributor - so a guest can take back their own mistake but
+        // Clause 3 is a guest deleting their own photo: the claimed deleter
+        // must match the recorded contributor, so a client can't casually
+        // remove someone else's. Since both are the same spoofable localStorage
+        // id that's a speed bump, not a guarantee - it's only safe because
+        // deletion is soft. This write hides a photo, never destroys one. The
+        // host's moderation goes through an API route with the host key, which
+        // the Admin SDK enforces properly.
+        //
+        // Clause 4 is undo, permitted only when the photo was removed by its
+        // own contributor - so a guest can take back their own mistake but
         // cannot reverse a host's moderation, which sets deletedBy 'host'.
-        // Second clause is the uploader editing their own caption. Like the
-        // delete clauses it validates shape but cannot verify WHO is editing -
-        // there is no guest auth, and contributorGuestId is readable by anyone
-        // who can read the photo. One difference is worth naming: a delete can
-        // be undone, an edit overwrites the previous text.
         allow update: if request.resource.data.diff(resource.data).affectedKeys().hasOnly(['reactedBy'])
                       || (
                            request.resource.data.diff(resource.data).affectedKeys().hasOnly(['caption'])

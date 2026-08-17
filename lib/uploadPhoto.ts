@@ -5,7 +5,7 @@ import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { addDoc, collection } from "firebase/firestore";
 import { storage, db } from "@/lib/firebase/client";
 import { newPhotoFields } from "@/lib/types/photo";
-import { makeThumbnail } from "@/lib/makeThumbnail";
+import { probeMedia } from "@/lib/makeThumbnail";
 
 export async function uploadPhoto(input: {
   boardId: string;
@@ -29,7 +29,7 @@ export async function uploadPhoto(input: {
   // original, so the Storage rules and the admin cascade already cover it.
   let thumbPath: string | null = null;
   let thumbUrl: string | null = null;
-  const thumbnail = await makeThumbnail(input.file);
+  const { thumbnail, durationSeconds } = await probeMedia(input.file);
   if (thumbnail) {
     thumbPath = `boards/${input.boardId}/photos/${id}-thumb.${thumbnail.extension}`;
     const thumbRef = ref(storage, thumbPath);
@@ -44,6 +44,8 @@ export async function uploadPhoto(input: {
       downloadUrl,
       thumbPath,
       thumbUrl,
+      contentType: input.file.type,
+      durationSeconds,
       caption: input.caption.trim(),
       contributorName: input.contributorName.trim(),
       contributorGuestId: input.contributorGuestId,

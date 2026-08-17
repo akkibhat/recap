@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { REACTION_EMOJIS, reactionCounts, ReactionEmoji } from "@/lib/types/photo";
+import { REACTION_EMOJIS, reactionCounts, isVideo, ReactionEmoji } from "@/lib/types/photo";
 import type { RollPhoto } from "@/lib/hooks/usePhotos";
 import { setReaction } from "@/lib/setReaction";
 import { Comment, MAX_COMMENT_LENGTH } from "@/lib/types/comment";
@@ -132,13 +132,29 @@ export function PhotoLightbox({
           </button>
         )}
 
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src={photo.downloadUrl}
-          alt={photo.caption || `Frame ${photo.frameNumber}`}
-          onClick={(e) => e.stopPropagation()}
-          className="max-h-full max-w-full object-contain"
-        />
+        {isVideo(photo) ? (
+          // key forces a fresh element when stepping between frames - reusing
+          // one leaves the previous clip's playback state and, in some
+          // browsers, its audio running over the next video.
+          <video
+            key={photo.id}
+            src={photo.downloadUrl}
+            poster={photo.thumbUrl ?? undefined}
+            controls
+            playsInline
+            preload="metadata"
+            onClick={(e) => e.stopPropagation()}
+            className="max-h-full max-w-full object-contain"
+          />
+        ) : (
+          /* eslint-disable-next-line @next/next/no-img-element */
+          <img
+            src={photo.downloadUrl}
+            alt={photo.caption || `Frame ${photo.frameNumber}`}
+            onClick={(e) => e.stopPropagation()}
+            className="max-h-full max-w-full object-contain"
+          />
+        )}
 
         {index < frames.length - 1 && (
           <button
