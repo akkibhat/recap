@@ -2,9 +2,11 @@ export type ReactionEmoji = "heart" | "laugh" | "fire" | "wow";
 
 export const REACTION_EMOJIS: ReactionEmoji[] = ["heart", "laugh", "fire", "wow"];
 
+// Lives at boards/{boardId}/photos/{photoId}. There is deliberately no
+// boardId field: the path is the only record of which board a photo belongs
+// to, so the two can never disagree.
 export type Photo = {
   id: string;
-  boardId: string;
   storagePath: string;
   downloadUrl: string;
   caption: string;
@@ -26,7 +28,6 @@ export type Photo = {
 };
 
 export function newPhotoFields(input: {
-  boardId: string;
   storagePath: string;
   downloadUrl: string;
   caption: string;
@@ -34,7 +35,6 @@ export function newPhotoFields(input: {
   contributorGuestId: string;
 }): Omit<Photo, "id"> {
   return {
-    boardId: input.boardId,
     storagePath: input.storagePath,
     downloadUrl: input.downloadUrl,
     caption: input.caption,
@@ -51,7 +51,6 @@ export function newPhotoFields(input: {
 export function normalisePhoto(id: string, data: Partial<Photo>): Photo {
   return {
     id,
-    boardId: data.boardId ?? "",
     storagePath: data.storagePath ?? "",
     downloadUrl: data.downloadUrl ?? "",
     caption: data.caption ?? "",

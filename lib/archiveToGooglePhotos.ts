@@ -40,7 +40,7 @@ export async function archiveBoardToGooglePhotos(boardId: string): Promise<Archi
 
   const accessToken = await refreshAccessToken(secret.googlePhotosRefreshToken);
 
-  const photosSnap = await adminDb.collection("photos").where("boardId", "==", boardId).get();
+  const photosSnap = await adminDb.collection("boards").doc(boardId).collection("photos").get();
   const livePhotos = photosSnap.docs
     .map((doc) => normalisePhoto(doc.id, doc.data()))
     // Deleted photos are skipped on both counts: they must not be pushed into

@@ -26,7 +26,9 @@ export async function GET(req: NextRequest) {
 
   const [boardsSnap, photosSnap] = await Promise.all([
     adminDb.collection("boards").orderBy("createdAt", "desc").get(),
-    adminDb.collection("photos").get(),
+    // Collection group rather than a top-level read: photos now live under
+    // their board, and a photo's board is its grandparent in the path.
+    adminDb.collectionGroup("photos").get(),
   ]);
 
   // One pass over all photos rather than a count query per board - at this
@@ -35,10 +37,12 @@ export async function GET(req: NextRequest) {
   const counts = new Map<string, { photos: number; deleted: number }>();
   for (const doc of photosSnap.docs) {
     const photo = normalisePhoto(doc.id, doc.data());
-    const entry = counts.get(photo.boardId) ?? { photos: 0, deleted: 0 };
+    const boardId = doc.ref.parent.parent?.id;
+    if (!boardId) continue;
+    const entry = counts.get(boardId) ?? { photos: 0, deleted: 0 };
     if (isVisible(photo)) entry.photos++;
     else entry.deleted++;
-    counts.set(photo.boardId, entry);
+    counts.set(boardId, entry);
   }
 
   const boards: AdminBoard[] = boardsSnap.docs.map((doc) => {

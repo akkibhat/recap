@@ -38,7 +38,7 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ b
   const bucket = adminStorage.bucket();
   await bucket.deleteFiles({ prefix: `boards/${boardId}/` });
 
-  const photosSnap = await adminDb.collection("photos").where("boardId", "==", boardId).get();
+  const photosSnap = await adminDb.collection("boards").doc(boardId).collection("photos").get();
   for (let i = 0; i < photosSnap.docs.length; i += BATCH_LIMIT) {
     const batch = adminDb.batch();
     for (const doc of photosSnap.docs.slice(i, i + BATCH_LIMIT)) batch.delete(doc.ref);

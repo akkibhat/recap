@@ -14,7 +14,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ boar
   if (!boardDoc.exists) return NextResponse.json({ error: "Board not found." }, { status: 404 });
   const board = normaliseBoard(boardDoc.id, boardDoc.data() ?? {});
 
-  const photosSnap = await adminDb.collection("photos").where("boardId", "==", boardId).get();
+  const photosSnap = await adminDb.collection("boards").doc(boardId).collection("photos").get();
   const bucket = adminStorage.bucket();
 
   const archive = new archiver.ZipArchive({ zlib: { level: 9 } });

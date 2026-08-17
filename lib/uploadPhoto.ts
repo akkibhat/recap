@@ -21,9 +21,8 @@ export async function uploadPhoto(input: {
   const downloadUrl = await getDownloadURL(storageRef);
 
   await addDoc(
-    collection(db, "photos"),
+    collection(db, "boards", input.boardId, "photos"),
     newPhotoFields({
-      boardId: input.boardId,
       storagePath,
       downloadUrl,
       caption: input.caption.trim(),

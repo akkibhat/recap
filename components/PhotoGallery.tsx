@@ -158,7 +158,7 @@ export function PhotoGallery({
             setOpenIndex(null);
             const wasMine = photo.contributorGuestId === guestId;
             try {
-              if (wasMine) await deleteOwnPhoto(photo.id, guestId);
+              if (wasMine) await deleteOwnPhoto(boardId, photo.id, guestId);
               else await deleteJson(`/api/boards/${boardId}/photos/${photo.id}`, hostKey ?? undefined);
               setRemoved({ photo, wasMine });
             } catch {
@@ -203,7 +203,7 @@ function UndoNotice({
       // A host removal is deliberately not reversible from the client - the
       // Firestore rule only lets a contributor undo their own - so it goes
       // back through the API route instead.
-      if (wasMine) await restoreOwnPhoto(photo.id);
+      if (wasMine) await restoreOwnPhoto(boardId, photo.id);
       else await postJson(`/api/boards/${boardId}/photos/${photo.id}`, {}, hostKey ?? undefined);
       onDone();
     } catch {
@@ -304,7 +304,7 @@ function PhotoFrame({
     setRemoving(true);
     try {
       if (isMine) {
-        await deleteOwnPhoto(photo.id, guestId);
+        await deleteOwnPhoto(boardId, photo.id, guestId);
       } else {
         await deleteJson(`/api/boards/${boardId}/photos/${photo.id}`, hostKey ?? undefined);
       }
@@ -376,7 +376,7 @@ function PhotoFrame({
         {REACTION_EMOJIS.map((emoji) => (
           <button
             key={emoji}
-            onClick={() => setReaction(photo.id, guestId, emoji, myReaction)}
+            onClick={() => setReaction(boardId, photo.id, guestId, emoji, myReaction)}
             aria-label={`React ${emoji}`}
             className={`flex min-w-7 flex-1 items-center justify-center gap-0.5 rounded-sm px-0.5 py-1.5 text-xs transition-transform active:scale-90 ${
               myReaction === emoji ? "bg-safelight/15 text-safelight" : "text-bone-dim"

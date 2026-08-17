@@ -166,7 +166,7 @@ export function PhotoLightbox({
             {REACTION_EMOJIS.map((emoji) => (
               <button
                 key={emoji}
-                onClick={() => setReaction(photo.id, guestId, emoji, myReaction)}
+                onClick={() => setReaction(boardId, photo.id, guestId, emoji, myReaction)}
                 aria-label={`React ${emoji}`}
                 className={`flex min-w-10 items-center justify-center gap-1 rounded-sm px-2 py-2 text-sm transition-transform active:scale-90 ${
                   myReaction === emoji ? "bg-safelight/15 text-safelight" : "text-bone-dim"

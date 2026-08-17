@@ -11,8 +11,12 @@ import { db } from "@/lib/firebase/client";
 // contributorGuestId, so passing someone else's guestId is rejected. Both ids
 // come from localStorage though, so this is a speed bump rather than a real
 // boundary - which is exactly why the write is soft.
-export async function deleteOwnPhoto(photoId: string, guestId: string): Promise<void> {
-  await updateDoc(doc(db, "photos", photoId), {
+export async function deleteOwnPhoto(
+  boardId: string,
+  photoId: string,
+  guestId: string
+): Promise<void> {
+  await updateDoc(doc(db, "boards", boardId, "photos", photoId), {
     deletedAt: Date.now(),
     deletedBy: guestId,
   });
@@ -24,8 +28,8 @@ export async function deleteOwnPhoto(photoId: string, guestId: string): Promise<
 // The matching rule only permits this when the photo was removed by its own
 // contributor, so a guest can undo their own mistake but not a host's
 // moderation decision.
-export async function restoreOwnPhoto(photoId: string): Promise<void> {
-  await updateDoc(doc(db, "photos", photoId), {
+export async function restoreOwnPhoto(boardId: string, photoId: string): Promise<void> {
+  await updateDoc(doc(db, "boards", boardId, "photos", photoId), {
     deletedAt: null,
     deletedBy: null,
   });
