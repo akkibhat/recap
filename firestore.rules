@@ -79,11 +79,20 @@ service cloud.firestore {
       // only safe because deletion here is soft: this write hides a photo, it
       // never destroys one. The host's own moderation goes through an API
       // route with the host key instead, which the Admin SDK enforces properly.
+      // Third clause is undo. Restoring is only permitted when the photo was
+      // removed by its own contributor, so a guest can take back their own
+      // mistake but cannot reverse a host's moderation - those are deleted
+      // with deletedBy 'host', which never equals a contributorGuestId.
       allow update: if request.resource.data.diff(resource.data).affectedKeys().hasOnly(['reactedBy'])
                     || (
                          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['deletedAt', 'deletedBy'])
                          && request.resource.data.deletedAt is number
                          && request.resource.data.deletedBy == resource.data.contributorGuestId
+                       )
+                    || (
+                         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['deletedAt', 'deletedBy'])
+                         && request.resource.data.deletedAt == null
+                         && resource.data.deletedBy == resource.data.contributorGuestId
                        );
 
       // Still never a hard delete from a client. Restoring, and any eventual

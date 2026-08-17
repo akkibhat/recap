@@ -35,3 +35,30 @@ export async function DELETE(
 
   return NextResponse.json({ ok: true });
 }
+
+// Undo for the host. The client rule deliberately won't let anyone reverse a
+// host removal (deletedBy 'host' never matches a contributorGuestId), so the
+// host's own undo has to come back through here.
+export async function POST(
+  req: NextRequest,
+  { params }: { params: Promise<{ boardId: string; photoId: string }> }
+) {
+  const { boardId, photoId } = await params;
+  const auth = await requireHostKey(req, boardId);
+  if (!auth.ok) return auth.response;
+
+  const photoRef = adminDb.collection("photos").doc(photoId);
+  const photoDoc = await photoRef.get();
+  if (!photoDoc.exists) {
+    return NextResponse.json({ error: "Photo not found." }, { status: 404 });
+  }
+
+  const photo = normalisePhoto(photoDoc.id, photoDoc.data() ?? {});
+  if (photo.boardId !== boardId) {
+    return NextResponse.json({ error: "That photo is not on this board." }, { status: 403 });
+  }
+
+  await photoRef.update({ deletedAt: null, deletedBy: null });
+
+  return NextResponse.json({ ok: true });
+}

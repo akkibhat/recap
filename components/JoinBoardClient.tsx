@@ -23,7 +23,7 @@ export function JoinBoardClient({ roomCode }: { roomCode: string }) {
   const { data: photos } = usePhotos(board?.id ?? null);
 
   if (loading || !guestId) {
-    return <CentredMessage title="Loading…" />;
+    return <CentredMessage title="Loading the roll…" />;
   }
 
   if (!board) {

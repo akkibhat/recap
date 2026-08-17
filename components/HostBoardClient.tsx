@@ -51,6 +51,9 @@ export function HostBoardClient({ boardId }: { boardId: string }) {
   const [ending, setEnding] = useState(false);
   const [endResult, setEndResult] = useState<EndResult | null>(null);
   const [connecting, setConnecting] = useState(false);
+  // Only meaningful once the QR has auto-collapsed - lets the host pull it
+  // back up for a latecomer without un-collapsing it for the rest of the night.
+  const [qrForced, setQrForced] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -140,7 +143,11 @@ export function HostBoardClient({ boardId }: { boardId: string }) {
   }
 
   if (loading || !guestId) {
-    return <div className="flex flex-1 items-center justify-center text-sm text-bone-dim">Loading…</div>;
+    return (
+      <div className="flex flex-1 items-center justify-center text-sm text-bone-dim">
+        Loading the roll…
+      </div>
+    );
   }
 
   if (!board) {
@@ -155,7 +162,7 @@ export function HostBoardClient({ boardId }: { boardId: string }) {
     if (authLoading || recovering) {
       return (
         <div className="flex flex-1 items-center justify-center text-sm text-bone-dim">
-          Finding your board…
+          Finding your roll…
         </div>
       );
     }
@@ -182,6 +189,9 @@ export function HostBoardClient({ boardId }: { boardId: string }) {
   // photo docs 404s - so the grid would render a wall of broken frames. The
   // album panel stands in for it.
   const photosLiveInStorage = !board.googlePhotosArchivedAt;
+  // Three frames in, people have found the board and the QR has done its job.
+  const rollUnderWay = photos.length >= 3;
+  const showQr = !rollUnderWay || qrForced;
 
   return (
     <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-6 px-4 py-6">
@@ -210,12 +220,35 @@ export function HostBoardClient({ boardId }: { boardId: string }) {
         />
       ) : (
         <div className="flex flex-col items-center gap-4 border border-line bg-surface p-6">
-          {qrDataUrl && (
-            <div className="bg-bone p-3">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={qrDataUrl} alt="QR code to join" className="block" />
-            </div>
-          )}
+          {/* The QR earns its 240px for the first few minutes and is in the way
+              for the rest of the night - on a phone you scroll past it, the
+              code and the buttons before reaching a single photo. Once the roll
+              is under way it folds down to a toggle, with the code itself still
+              readable as text for anyone reading it out. */}
+          {qrDataUrl &&
+            (showQr ? (
+              <div className="flex flex-col items-center gap-3">
+                <div className="bg-bone p-3">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={qrDataUrl} alt="QR code to join" className="block" />
+                </div>
+                {rollUnderWay && (
+                  <button
+                    onClick={() => setQrForced(false)}
+                    className="text-xs text-bone-faint underline underline-offset-4 hover:text-bone"
+                  >
+                    Hide QR
+                  </button>
+                )}
+              </div>
+            ) : (
+              <button
+                onClick={() => setQrForced(true)}
+                className="text-xs text-bone-dim underline underline-offset-4 hover:text-bone"
+              >
+                Show QR to join
+              </button>
+            ))}
           {/* The room code as a length of film leader - the strip of exposed
               film at the head of a roll, which is where the stock and speed
               are printed. It's the one place in the app that gets the full
@@ -264,11 +297,21 @@ export function HostBoardClient({ boardId }: { boardId: string }) {
             >
               Download all as zip
             </a>
-            <button onClick={openEndDialog} disabled={ending} className={buttonDangerClass}>
-              Develop the roll
-            </button>
           </div>
           {error && <p className="text-sm text-safelight">{error}</p>}
+        </div>
+      )}
+
+      {/* Developing the roll ends the night and can permanently clear photos
+          out of Storage. It used to sit beside "Download all as zip" at equal
+          width and weight, which read as two interchangeable options. Its own
+          row, away from the panel, makes the asymmetry visible. */}
+      {!board.endedAt && (
+        <div className="flex flex-col items-center gap-1">
+          <button onClick={openEndDialog} disabled={ending} className={buttonDangerClass}>
+            Develop the roll
+          </button>
+          <p className="text-[11px] text-bone-faint">Ends the night. Guests can&apos;t add more.</p>
         </div>
       )}
 

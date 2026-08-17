@@ -17,3 +17,16 @@ export async function deleteOwnPhoto(photoId: string, guestId: string): Promise<
     deletedBy: guestId,
   });
 }
+
+// Undo. Cheap precisely because deletion is soft - the document never went
+// anywhere, so putting a photo back is just clearing the two fields.
+//
+// The matching rule only permits this when the photo was removed by its own
+// contributor, so a guest can undo their own mistake but not a host's
+// moderation decision.
+export async function restoreOwnPhoto(photoId: string): Promise<void> {
+  await updateDoc(doc(db, "photos", photoId), {
+    deletedAt: null,
+    deletedBy: null,
+  });
+}

@@ -4,8 +4,8 @@ import { useEffect, useState } from "react";
 import { REACTION_EMOJIS, reactionCounts, ReactionEmoji } from "@/lib/types/photo";
 import type { RollPhoto } from "@/lib/hooks/usePhotos";
 import { setReaction } from "@/lib/setReaction";
-import { deleteOwnPhoto } from "@/lib/deletePhoto";
-import { deleteJson } from "@/lib/api";
+import { deleteOwnPhoto, restoreOwnPhoto } from "@/lib/deletePhoto";
+import { deleteJson, postJson } from "@/lib/api";
 
 const EMOJI_GLYPH: Record<ReactionEmoji, string> = {
   heart: "❤️",
@@ -86,8 +86,11 @@ export function PhotoGallery({
   hostKey?: string | null;
 }) {
   const columnCount = useColumnCount();
+  // The removed photo itself, not just its id: once it leaves the live query
+  // there is nothing left to look its details up from.
+  const [removed, setRemoved] = useState<{ photo: RollPhoto; wasMine: boolean } | null>(null);
 
-  if (photos.length === 0) {
+  if (photos.length === 0 && !removed) {
     return (
       <div className="border border-dashed border-line py-16 text-center">
         <p className="text-sm text-bone-dim">Nothing developed yet</p>
@@ -102,16 +105,83 @@ export function PhotoGallery({
   const frames = [...photos].reverse();
 
   return (
-    <div className="flex gap-3">
-      {dealIntoColumns(frames, columnCount).map((column, index) => (
-        <FilmStrip
-          key={index}
-          frames={column}
-          guestId={guestId}
+    <div className="flex flex-col gap-3">
+      {removed && (
+        <UndoNotice
+          removed={removed}
           boardId={boardId}
           hostKey={hostKey}
+          onDone={() => setRemoved(null)}
         />
-      ))}
+      )}
+
+      <div className="flex gap-3">
+        {dealIntoColumns(frames, columnCount).map((column, index) => (
+          <FilmStrip
+            key={index}
+            frames={column}
+            guestId={guestId}
+            boardId={boardId}
+            hostKey={hostKey}
+            onRemoved={(photo, wasMine) => setRemoved({ photo, wasMine })}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// Undo is cheap only because deletion is soft: the document never left, so
+// putting a frame back is clearing two fields. Shown inline above the strips
+// rather than as a floating toast, which would need fixed positioning and
+// would cover a frame on a phone.
+function UndoNotice({
+  removed,
+  boardId,
+  hostKey,
+  onDone,
+}: {
+  removed: { photo: RollPhoto; wasMine: boolean };
+  boardId: string;
+  hostKey?: string | null;
+  onDone: () => void;
+}) {
+  const [busy, setBusy] = useState(false);
+  const { photo, wasMine } = removed;
+
+  // Clears itself after a while so a stale "removed" line doesn't sit there
+  // all night. Keyed on the photo id so removing a second frame restarts it.
+  useEffect(() => {
+    const timer = setTimeout(onDone, 12000);
+    return () => clearTimeout(timer);
+  }, [photo.id, onDone]);
+
+  async function handleUndo() {
+    setBusy(true);
+    try {
+      // A host removal is deliberately not reversible from the client - the
+      // Firestore rule only lets a contributor undo their own - so it goes
+      // back through the API route instead.
+      if (wasMine) await restoreOwnPhoto(photo.id);
+      else await postJson(`/api/boards/${boardId}/photos/${photo.id}`, {}, hostKey ?? undefined);
+      onDone();
+    } catch {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="flex items-center justify-between gap-3 border border-line bg-surface px-3 py-2">
+      <span className="min-w-0 truncate text-xs text-bone-dim">
+        Frame {photo.frameNumber} taken off the roll
+      </span>
+      <button
+        onClick={handleUndo}
+        disabled={busy}
+        className="shrink-0 text-xs text-safelight underline underline-offset-4 hover:text-bone disabled:opacity-30"
+      >
+        {busy ? "Undoing…" : "Undo"}
+      </button>
     </div>
   );
 }
@@ -126,11 +196,13 @@ function FilmStrip({
   guestId,
   boardId,
   hostKey,
+  onRemoved,
 }: {
   frames: RollPhoto[];
   guestId: string;
   boardId: string;
   hostKey?: string | null;
+  onRemoved: (photo: RollPhoto, wasMine: boolean) => void;
 }) {
   return (
     <div className="flex min-w-0 flex-1 bg-frame">
@@ -143,6 +215,7 @@ function FilmStrip({
             guestId={guestId}
             boardId={boardId}
             hostKey={hostKey}
+            onRemoved={onRemoved}
           />
         ))}
       </div>
@@ -156,11 +229,13 @@ function PhotoFrame({
   guestId,
   boardId,
   hostKey,
+  onRemoved,
 }: {
   photo: RollPhoto;
   guestId: string;
   boardId: string;
   hostKey?: string | null;
+  onRemoved: (photo: RollPhoto, wasMine: boolean) => void;
 }) {
   const counts = reactionCounts(photo);
   const myReaction = photo.reactedBy[guestId];
@@ -171,15 +246,10 @@ function PhotoFrame({
   const isMine = photo.contributorGuestId === guestId;
   const canRemove = isMine || Boolean(hostKey);
 
+  // No confirm dialog: removal is undoable for the next few seconds via the
+  // notice the gallery shows, which is friendlier than a modal on a phone and
+  // honest about what deleting actually does.
   async function handleRemove() {
-    // Says out loud that removal takes a photo off the board but doesn't
-    // guarantee the host discards it - they review deleted frames when the
-    // board ends and may keep them. Deleting is soft by design, so promising
-    // anything stronger here would be a lie.
-    const warning = isMine
-      ? "Take your photo off the roll? The host still sees it when they develop the roll, and can choose to keep it."
-      : "Take this photo off the roll? You'll still see it when you develop the roll.";
-    if (!confirm(warning)) return;
     setRemoving(true);
     try {
       if (isMine) {
@@ -187,8 +257,9 @@ function PhotoFrame({
       } else {
         await deleteJson(`/api/boards/${boardId}/photos/${photo.id}`, hostKey ?? undefined);
       }
-      // No success branch: the photo drops out of the live query, so this
-      // component unmounts on its own.
+      // The photo drops out of the live query and this component unmounts, so
+      // the "removed" notice has to be owned by the gallery above.
+      onRemoved(photo, isMine);
     } catch {
       setRemoving(false);
     }
@@ -196,40 +267,52 @@ function PhotoFrame({
 
   return (
     <div className="py-1.5">
-      {/* 2:3 rather than 35mm's native 3:2, because these are phone photos.
-          A portrait shot survives this crop untouched where a landscape one
-          keeps 44% - and at a party, phones are held upright. No single ratio
-          is kind to both orientations, so this picks the common case. */}
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        src={photo.downloadUrl}
-        alt={photo.caption || "Party photo"}
-        className="aspect-2/3 w-full object-cover"
-      />
+      <div className="relative">
+        {/* 2:3 rather than 35mm's native 3:2, because these are phone photos.
+            A portrait shot survives this crop untouched where a landscape one
+            keeps 44% - and at a party, phones are held upright. No single
+            ratio is kind to both orientations, so this picks the common case. */}
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={photo.downloadUrl}
+          alt={photo.caption || "Party photo"}
+          className="aspect-2/3 w-full object-cover"
+        />
 
-      {/* Always rendered, and always exactly one line, even with no caption -
-          hence the non-breaking space holding the line box open.
+        {/* Sits on the photo rather than in the reactions row. A destructive
+            control among four emoji is easy to hit with a thumb aiming for a
+            reaction, and reads oddly beside them. */}
+        {canRemove && (
+          <button
+            onClick={handleRemove}
+            disabled={removing}
+            aria-label={isMine ? "Remove your photo" : "Remove this photo"}
+            className="absolute top-1 right-1 flex size-7 items-center justify-center bg-ink/60 text-xs text-bone/70 hover:bg-ink/80 hover:text-safelight disabled:opacity-30"
+          >
+            {removing ? "…" : "✕"}
+          </button>
+        )}
+      </div>
 
-          Frames on a roll are identical by definition, but there's a
-          structural reason too: dealIntoColumns keeps the strips level by
-          assuming every frame is the same height, and it has no way to know
-          that some are a line shorter. Letting captions size the frame made
-          uncaptioned photos 22px shorter and the strips drift out of step.
+      {/* Caption and edge printing share one line: the caption takes whatever
+          is left and truncates, the frame number and contributor hold their
+          place at the end.
 
-          Long captions truncate rather than wrap, for the same reason. The
-          full text belongs in the lightbox. */}
-      <p className="truncate pt-1.5 text-xs leading-snug text-bone">
-        {photo.caption || " "}
-      </p>
-
-      <p className="truncate pt-1.5 font-mono text-[11px] tracking-widest text-edge uppercase">
-        {photo.frameNumber} {photo.contributorName}
-      </p>
+          Exactly one line either way, captioned or not. Frames on a roll are
+          identical by definition, and structurally dealIntoColumns keeps the
+          strips level only because it can assume equal heights - it has no way
+          to know that some frames are a line shorter. */}
+      <div className="flex items-baseline gap-2 pt-1.5">
+        <p className="min-w-0 flex-1 truncate text-xs leading-snug text-bone">{photo.caption}</p>
+        <p className="shrink-0 font-mono text-[11px] tracking-widest text-edge uppercase">
+          {photo.frameNumber} {photo.contributorName}
+        </p>
+      </div>
 
       {/* On its own row rather than sharing the edge-printing line: a strip is
           roughly half the width of the old grid card, and four reaction
           targets alongside a name does not fit on a phone. */}
-      <div className="flex gap-0.5 pt-0.5">
+      <div className="flex gap-0.5">
         {REACTION_EMOJIS.map((emoji) => (
           <button
             key={emoji}
@@ -243,18 +326,6 @@ function PhotoFrame({
             {counts[emoji] > 0 && <span className="tabular-nums">{counts[emoji]}</span>}
           </button>
         ))}
-
-        {canRemove && (
-          <button
-            onClick={handleRemove}
-            disabled={removing}
-            aria-label={isMine ? "Remove your photo" : "Remove this photo"}
-            title={isMine ? "Remove your photo" : "Remove this photo"}
-            className="flex min-w-7 shrink-0 items-center justify-center rounded-sm px-0.5 py-1.5 text-xs text-bone-faint hover:text-safelight disabled:opacity-30"
-          >
-            {removing ? "…" : "✕"}
-          </button>
-        )}
       </div>
     </div>
   );
