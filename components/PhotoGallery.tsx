@@ -28,15 +28,15 @@ function frameNumber(index: number): string {
 // One strip on a phone, two once there's room, and deliberately never three.
 //
 // A phone gets a single strip because splitting a ~343px content width in two
-// leaves each 3:2 frame about 136px across and 91px tall - too small to make
-// out a face, with no lightbox to fall back on. One strip gives roughly
-// 313px-wide frames instead, which is the point of looking at photos at all.
+// leaves each frame about 136px across - too small to make out a face, with no
+// lightbox to fall back on. One strip gives 313x470 frames instead, which is
+// the point of looking at photos at all.
 //
 // It stops at two for the same reason at the other end. The page is capped at
 // max-w-2xl, so the gallery never exceeds ~640px however large the screen is;
-// a third strip divides that into 175px frames, smaller than a phone shows.
-// That would leave the biggest screens displaying the smallest photos. Adding
-// a third strip only makes sense alongside widening the page container.
+// a third strip divides that into 175px-wide frames, narrower than a phone
+// shows. That would leave the biggest screens displaying the smallest photos.
+// Adding a third strip only makes sense alongside widening the page container.
 //
 // Starts at 1 on both server and client and only widens after mount: reading
 // matchMedia during the first render would make the two disagree and break
@@ -141,11 +141,15 @@ function PhotoFrame({
 
   return (
     <div className="py-1.5">
+      {/* 2:3 rather than 35mm's native 3:2, because these are phone photos.
+          A portrait shot survives this crop untouched where a landscape one
+          keeps 44% - and at a party, phones are held upright. No single ratio
+          is kind to both orientations, so this picks the common case. */}
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         src={photo.downloadUrl}
         alt={photo.caption || "Party photo"}
-        className="aspect-3/2 w-full object-cover"
+        className="aspect-2/3 w-full object-cover"
       />
 
       {photo.caption && <p className="pt-1.5 text-xs leading-snug text-bone">{photo.caption}</p>}
