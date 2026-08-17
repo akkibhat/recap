@@ -4,6 +4,25 @@ import { useState } from "react";
 import Link from "next/link";
 import { useAuth, signInWithGoogle, signOutHost } from "@/lib/hooks/useAuth";
 
+// Firebase's own messages are written for developers - "Database is
+// closing/hidden" tells a host nothing, and closing the popup yourself isn't
+// an error worth a red line at all. Anything unrecognised falls through with
+// its real text, so a genuinely new failure isn't swallowed.
+function signInMessage(err: unknown): string | null {
+  const code = typeof err === "object" && err && "code" in err ? String(err.code) : "";
+
+  if (code === "auth/popup-closed-by-user" || code === "auth/cancelled-popup-request") return null;
+  if (code === "auth/popup-blocked") return "Your browser blocked the sign-in window. Allow popups and try again.";
+  if (code === "auth/network-request-failed") return "Couldn't reach Google. Check your connection and try again.";
+
+  const message = err instanceof Error ? err.message : "";
+  if (message.includes("Database is closing")) {
+    return "Sign-in was interrupted. Try again without switching away from this tab.";
+  }
+
+  return message || "Sign-in didn't complete.";
+}
+
 // Sign-in is offered, never required. A host can start a board without it and
 // everything works; what they give up is being able to get that board back on
 // another device or after clearing their browser. The copy says so rather than
@@ -19,9 +38,7 @@ export function HostSignIn() {
     try {
       await action();
     } catch (err) {
-      // A popup the browser blocked, or one the host closed, both land here.
-      // Neither is worth a scary message.
-      setError(err instanceof Error ? err.message : "Sign-in didn't complete.");
+      setError(signInMessage(err));
     } finally {
       setBusy(false);
     }
