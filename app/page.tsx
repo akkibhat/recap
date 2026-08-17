@@ -47,7 +47,7 @@ export default function Home() {
           </span>
           <h1 className="text-3xl font-medium tracking-tight">recap</h1>
           <p className="text-center text-sm text-bone-dim">
-            Everyone adds the memories. Relive it together after.
+            Everyone adds a frame. Everyone gets the roll.
           </p>
         </div>
 

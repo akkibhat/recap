@@ -10,7 +10,10 @@ const plexMono = IBM_Plex_Mono({
 
 export const metadata: Metadata = {
   title: "recap",
-  description: "Everyone adds the memories. Relive it together after.",
+  // Kept identical to the hero tagline on the home page - this is what shows
+  // in a link preview when someone shares the join URL, which is often the
+  // first thing a guest ever reads about the app.
+  description: "Everyone adds a frame. Everyone gets the roll.",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
