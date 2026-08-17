@@ -10,7 +10,9 @@ function requireEnv(name: string): string {
   return value;
 }
 
-export function getGooglePhotosAuthUrl(boardId: string): string {
+// `state` is an opaque nonce recorded server-side, not a subject identifier -
+// see the connect route for why.
+export function getGooglePhotosAuthUrl(state: string): string {
   const params = new URLSearchParams({
     client_id: requireEnv("GOOGLE_OAUTH_CLIENT_ID"),
     redirect_uri: REDIRECT_URI,
@@ -21,7 +23,7 @@ export function getGooglePhotosAuthUrl(boardId: string): string {
     // before - otherwise a repeat auth (e.g. after the 7-day testing-mode
     // token expiry) silently omits it.
     prompt: "consent",
-    state: boardId,
+    state,
   });
   return `https://accounts.google.com/o/oauth2/v2/auth?${params}`;
 }

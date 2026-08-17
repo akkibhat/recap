@@ -1,45 +1,53 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebase/admin";
-import { exchangeCodeForTokens, createAlbum } from "@/lib/googlePhotos";
-import { normaliseBoard } from "@/lib/types/board";
+import { exchangeCodeForTokens } from "@/lib/googlePhotos";
 
+// Completes the account-level Google Photos handshake. No album is created
+// here any more: albums are per board and named after it, so one gets made at
+// archive time instead. Connecting used to leave an empty album behind for
+// every board, whether or not anything was ever archived to it.
 export async function GET(req: NextRequest) {
   const code = req.nextUrl.searchParams.get("code");
-  const boardId = req.nextUrl.searchParams.get("state");
+  const state = req.nextUrl.searchParams.get("state");
   const origin = req.nextUrl.origin;
 
-  if (!code || !boardId) {
+  if (!code || !state) {
     return NextResponse.redirect(`${origin}/?error=google-photos-cancelled`);
   }
 
-  const boardDoc = await adminDb.collection("boards").doc(boardId).get();
-  if (!boardDoc.exists) {
-    return NextResponse.redirect(`${origin}/?error=board-not-found`);
+  // The nonce is consumed whatever happens next, so a state can't be replayed.
+  const stateRef = adminDb.collection("oauthStates").doc(state);
+  const stateDoc = await stateRef.get();
+  await stateRef.delete().catch(() => {});
+
+  if (!stateDoc.exists) {
+    return NextResponse.redirect(`${origin}/?error=google-photos-state`);
   }
-  const board = normaliseBoard(boardDoc.id, boardDoc.data() ?? {});
+  const { uid, expiresAt } = stateDoc.data() as { uid: string; expiresAt: number };
+  if (!uid || Date.now() > expiresAt) {
+    return NextResponse.redirect(`${origin}/?error=google-photos-expired`);
+  }
 
   try {
-    const { accessToken, refreshToken } = await exchangeCodeForTokens(code);
+    const { refreshToken } = await exchangeCodeForTokens(code);
     if (!refreshToken) {
-      // Shouldn't happen with access_type=offline&prompt=consent, but
-      // without one there's nothing to archive with once this token expires.
+      // Shouldn't happen with access_type=offline&prompt=consent, but without
+      // one there's nothing to archive with once the access token expires.
       throw new Error("Google did not return a refresh token.");
     }
 
-    const album = await createAlbum(accessToken, `Recap - ${board.title}`);
-
     await adminDb.runTransaction(async (tx) => {
-      tx.update(adminDb.collection("boardSecrets").doc(boardId), {
-        googlePhotosRefreshToken: refreshToken,
-        googlePhotosAlbumId: album.id,
-        googlePhotosAlbumUrl: album.productUrl,
-      });
-      tx.update(adminDb.collection("boards").doc(boardId), { googlePhotosConnected: true });
+      tx.set(adminDb.collection("userSecrets").doc(uid), { googlePhotosRefreshToken: refreshToken }, { merge: true });
+      tx.set(
+        adminDb.collection("users").doc(uid),
+        { googlePhotosConnected: true, googlePhotosConnectedAt: Date.now() },
+        { merge: true }
+      );
     });
 
-    return NextResponse.redirect(`${origin}/host/${boardId}`);
+    return NextResponse.redirect(`${origin}/boards?connected=google-photos`);
   } catch (err) {
     console.error("Google Photos connect failed:", err);
-    return NextResponse.redirect(`${origin}/host/${boardId}?error=google-photos-failed`);
+    return NextResponse.redirect(`${origin}/boards?error=google-photos-failed`);
   }
 }

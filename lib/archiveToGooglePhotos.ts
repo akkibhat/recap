@@ -1,7 +1,8 @@
 import { adminDb, adminStorage } from "@/lib/firebase/admin";
 import { normalisePhoto, isVisible } from "@/lib/types/photo";
-import { normaliseBoardSecret } from "@/lib/types/boardSecret";
-import { refreshAccessToken, addPhotoToAlbum } from "@/lib/googlePhotos";
+import { normaliseBoard } from "@/lib/types/board";
+import { normaliseUserSecret } from "@/lib/types/userAccount";
+import { refreshAccessToken, createAlbum, addPhotoToAlbum } from "@/lib/googlePhotos";
 
 export type ArchiveResult = {
   // How many photos made it into the album. Surfaced to the host so a silent
@@ -13,8 +14,9 @@ export type ArchiveResult = {
 };
 
 // Called on session end, but ONLY when the host explicitly asks for it - see
-// the end route. Pushes every photo into the connected album, then deletes the
-// Firebase Storage copies so nothing sits racking up quota after the event.
+// the end route. Pushes every photo into a fresh album named after the board,
+// then deletes the Firebase Storage copies so nothing sits racking up quota
+// after the event.
 //
 // The upload and the delete are deliberately two separate passes. Interleaving
 // them (upload one, delete one) means a failure partway through leaves the
@@ -23,33 +25,46 @@ export type ArchiveResult = {
 // additive: the album may end up with duplicates on a retry, but no photo is
 // ever deleted unless the whole batch reached Google.
 export async function archiveBoardToGooglePhotos(boardId: string): Promise<ArchiveResult> {
-  const secretDoc = await adminDb.collection("boardSecrets").doc(boardId).get();
-  const secret = normaliseBoardSecret(secretDoc.data() ?? {});
-  if (!secret.googlePhotosRefreshToken || !secret.googlePhotosAlbumId) {
-    return { archivedCount: 0, albumUrl: null };
-  }
+  const boardDoc = await adminDb.collection("boards").doc(boardId).get();
+  if (!boardDoc.exists) return { archivedCount: 0, albumUrl: null };
+  const board = normaliseBoard(boardDoc.id, boardDoc.data() ?? {});
+
+  // The Google grant belongs to the account that ran the board, not the board
+  // itself, so an unowned board (created before sign-in existed) has nothing
+  // to archive with even if the host is standing right there.
+  if (!board.ownerUid) return { archivedCount: 0, albumUrl: null };
+
+  const secretDoc = await adminDb.collection("userSecrets").doc(board.ownerUid).get();
+  const secret = normaliseUserSecret(secretDoc.data() ?? {});
+  if (!secret.googlePhotosRefreshToken) return { archivedCount: 0, albumUrl: null };
 
   const accessToken = await refreshAccessToken(secret.googlePhotosRefreshToken);
-  const albumId = secret.googlePhotosAlbumId;
 
   const photosSnap = await adminDb.collection("photos").where("boardId", "==", boardId).get();
+  const livePhotos = photosSnap.docs
+    .map((doc) => normalisePhoto(doc.id, doc.data()))
+    // Deleted photos are skipped on both counts: they must not be pushed into
+    // the album, and pass 2 must not delete their Storage copy - a soft delete
+    // is meant to stay recoverable, and this is the one code path in the app
+    // that removes bytes for good.
+    .filter(isVisible);
+
+  if (livePhotos.length === 0) return { archivedCount: 0, albumUrl: null };
+
+  // Created here rather than at connect time. Albums are per board and named
+  // after it, so making one when the account connects produced an empty album
+  // for a board that might never archive anything.
+  const album = await createAlbum(accessToken, `Recap - ${board.title}`);
   const bucket = adminStorage.bucket();
 
   // Pass 1 - upload. Anything that throws here aborts before a single delete,
   // leaving Storage exactly as it was.
   const uploadedPaths: string[] = [];
-  for (const doc of photosSnap.docs) {
-    const photo = normalisePhoto(doc.id, doc.data());
-    // Deleted photos are skipped on both counts: they must not be pushed into
-    // the album, and pass 2 must not delete their Storage copy - a soft delete
-    // is meant to stay recoverable, and this is the one code path in the app
-    // that removes bytes for good.
-    if (!isVisible(photo)) continue;
-
+  for (const photo of livePhotos) {
     const [bytes] = await bucket.file(photo.storagePath).download();
-    const filename = photo.storagePath.split("/").pop() ?? `${doc.id}.jpg`;
+    const filename = photo.storagePath.split("/").pop() ?? `${photo.id}.jpg`;
 
-    await addPhotoToAlbum(accessToken, albumId, bytes, filename);
+    await addPhotoToAlbum(accessToken, album.id, bytes, filename);
     uploadedPaths.push(photo.storagePath);
   }
 
@@ -60,5 +75,10 @@ export async function archiveBoardToGooglePhotos(boardId: string): Promise<Archi
     uploadedPaths.map((path) => bucket.file(path).delete({ ignoreNotFound: true }))
   );
 
-  return { archivedCount: uploadedPaths.length, albumUrl: secret.googlePhotosAlbumUrl };
+  await adminDb.collection("boardSecrets").doc(boardId).set(
+    { googlePhotosAlbumId: album.id, googlePhotosAlbumUrl: album.productUrl },
+    { merge: true }
+  );
+
+  return { archivedCount: uploadedPaths.length, albumUrl: album.productUrl };
 }

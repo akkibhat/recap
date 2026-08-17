@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebase/admin";
 import { requireHostKey } from "@/lib/hostAuth";
-import { normaliseBoard } from "@/lib/types/board";
 import { archiveBoardToGooglePhotos } from "@/lib/archiveToGooglePhotos";
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ boardId: string }> }) {
@@ -22,24 +21,26 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ boa
   if (!boardDoc.exists) {
     return NextResponse.json({ error: "Board not found." }, { status: 404 });
   }
-  const board = normaliseBoard(boardDoc.id, boardDoc.data() ?? {});
-  const shouldArchive = wantsArchive && board.googlePhotosConnected;
 
   let archiveError: string | null = null;
   let archivedCount = 0;
   let albumUrl: string | null = null;
   let archivedAt: number | null = null;
 
-  if (shouldArchive) {
+  // Whether Google Photos is actually connected is the archiver's business
+  // now, since the grant belongs to the owning account rather than the board.
+  // It returns a zero result rather than throwing when there's nothing to
+  // archive with.
+  if (wantsArchive) {
     try {
       const result = await archiveBoardToGooglePhotos(boardId);
       archivedCount = result.archivedCount;
       albumUrl = result.albumUrl;
-      // Only stamped on a clean run. The gallery keys off this to know the
-      // Storage copies are gone, so a failed archive must leave it null -
-      // otherwise the host sees broken thumbnails for photos that are in fact
-      // still there.
-      archivedAt = Date.now();
+      // Only stamped when photos actually moved. The gallery keys off this to
+      // know the Storage copies are gone, so a failed or no-op archive must
+      // leave it null - otherwise the host sees broken frames for photos that
+      // are in fact still there.
+      if (archivedCount > 0) archivedAt = Date.now();
     } catch (err) {
       // Don't block ending the board on an archive failure - the photos stay
       // in Storage either way, so nothing is lost, just not yet archived.

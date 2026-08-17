@@ -11,7 +11,6 @@ export type AdminBoard = {
   createdAt: number;
   endedAt: number | null;
   ownerUid: string | null;
-  googlePhotosConnected: boolean;
   photoCount: number;
   deletedCount: number;
 };
@@ -52,7 +51,6 @@ export async function GET(req: NextRequest) {
       createdAt: board.createdAt,
       endedAt: board.endedAt,
       ownerUid: board.ownerUid,
-      googlePhotosConnected: board.googlePhotosConnected,
       photoCount: entry.photos,
       deletedCount: entry.deleted,
     };

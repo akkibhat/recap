@@ -20,7 +20,6 @@ type AdminBoard = {
   createdAt: number;
   endedAt: number | null;
   ownerUid: string | null;
-  googlePhotosConnected: boolean;
   photoCount: number;
   deletedCount: number;
 };

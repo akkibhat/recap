@@ -28,6 +28,26 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    // Account-level host state. Readable by its owner so the UI can show
+    // whether Google Photos is connected without a round trip, but written
+    // only by the OAuth callback via the Admin SDK.
+    match /users/{uid} {
+      allow get: if request.auth != null && request.auth.uid == uid;
+      allow list, write: if false;
+    }
+
+    // The Google refresh token and the shared deleted-photos album live here.
+    // Closed to every client, exactly like boardSecrets.
+    match /userSecrets/{uid} {
+      allow read, write: if false;
+    }
+
+    // Pending OAuth handshakes. The nonce IS the secret, so nothing may read
+    // or enumerate these - only the callback route resolves them, server-side.
+    match /oauthStates/{state} {
+      allow read, write: if false;
+    }
+
     // Guests never log in, so there's no auth check here - anyone who
     // knows a boardId can add a photo to it, same trust model as knowing
     // the room code/QR at all. Field shape is validated so a malformed

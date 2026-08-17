@@ -6,6 +6,7 @@ import { useBoardById } from "@/lib/hooks/useBoard";
 import { usePhotos } from "@/lib/hooks/usePhotos";
 import { getHostKey, saveHostKey } from "@/lib/hostIdentity";
 import { useAuth } from "@/lib/hooks/useAuth";
+import { useUserAccount } from "@/lib/hooks/useUserAccount";
 import { getOrCreateGuestId, getGuestName, setGuestName } from "@/lib/guestIdentity";
 import { postJson, getJson } from "@/lib/api";
 import { PhotoGallery } from "@/components/PhotoGallery";
@@ -28,6 +29,7 @@ export function HostBoardClient({ boardId }: { boardId: string }) {
   // time (null on the server, real value on the client's first render)
   // rather than mirrored into state via an effect.
   const { user, loading: authLoading } = useAuth();
+  const { data: account } = useUserAccount(user?.uid ?? null);
   const [hostKey, setHostKey] = useState<string | null>(() =>
     typeof window !== "undefined" ? getHostKey(boardId) : null
   );
@@ -95,7 +97,7 @@ export function HostBoardClient({ boardId }: { boardId: string }) {
   // that's what connecting was for - but the host still has to pass through
   // the dialog, so it's never a silent default.
   function openEndDialog() {
-    setArchiveOnEnd(board?.googlePhotosConnected ?? false);
+    setArchiveOnEnd(account?.googlePhotosConnected ?? false);
     setError(null);
     setConfirmingEnd(true);
   }
@@ -126,7 +128,7 @@ export function HostBoardClient({ boardId }: { boardId: string }) {
     try {
       const { authUrl } = await postJson<{ authUrl: string }>(
         "/api/google-photos/connect",
-        { boardId },
+        {},
         hostKey
       );
       window.location.href = authUrl;
@@ -188,7 +190,13 @@ export function HostBoardClient({ boardId }: { boardId: string }) {
       </div>
 
       {board.endedAt ? (
-        <EndedPanel boardId={boardId} hostKey={hostKey} board={board} endResult={endResult} />
+        <EndedPanel
+          boardId={boardId}
+          hostKey={hostKey}
+          board={board}
+          googlePhotosConnected={account?.googlePhotosConnected ?? false}
+          endResult={endResult}
+        />
       ) : (
         <div className="flex flex-col items-center gap-4 border border-line bg-surface p-6">
           {qrDataUrl && (
@@ -218,11 +226,15 @@ export function HostBoardClient({ boardId }: { boardId: string }) {
           </div>
           <p className="text-xs text-bone-faint">Scan, or go to /join/{board.roomCode}</p>
 
-          {board.googlePhotosConnected ? (
+          {/* Connection is a property of the signed-in account now, not of
+              this board - connect once and every board can archive. A host
+              who isn't signed in has nowhere to hang the grant, so they're
+              pointed at sign-in rather than shown a button that can't work. */}
+          {account?.googlePhotosConnected ? (
             <p className="text-xs text-bone-dim">
-              Google Photos connected — you can archive there when you end the board.
+              Google Photos connected — you can archive there when you develop the roll.
             </p>
-          ) : (
+          ) : user ? (
             <button
               onClick={handleConnectGooglePhotos}
               disabled={connecting}
@@ -230,6 +242,8 @@ export function HostBoardClient({ boardId }: { boardId: string }) {
             >
               {connecting ? "Connecting…" : "Connect Google Photos (optional)"}
             </button>
+          ) : (
+            <p className="text-xs text-bone-faint">Sign in to archive to Google Photos</p>
           )}
 
           <div className="flex w-full flex-col gap-2 border-t border-line pt-4 sm:flex-row sm:justify-center">
@@ -249,7 +263,7 @@ export function HostBoardClient({ boardId }: { boardId: string }) {
 
       {confirmingEnd && (
         <EndBoardDialog
-          googlePhotosConnected={board.googlePhotosConnected}
+          googlePhotosConnected={account?.googlePhotosConnected ?? false}
           archiveOnEnd={archiveOnEnd}
           onToggleArchive={setArchiveOnEnd}
           ending={ending}
@@ -374,11 +388,13 @@ function EndedPanel({
   boardId,
   hostKey,
   board,
+  googlePhotosConnected,
   endResult,
 }: {
   boardId: string;
   hostKey: string;
-  board: { googlePhotosConnected: boolean; googlePhotosArchivedAt: number | null; googlePhotosShareUrl: string | null };
+  board: { googlePhotosArchivedAt: number | null; googlePhotosShareUrl: string | null };
+  googlePhotosConnected: boolean;
   endResult: EndResult | null;
 }) {
   // The album URL lives in boardSecrets, which no client can read, so it has
@@ -390,11 +406,11 @@ function EndedPanel({
   const [shareError, setShareError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (albumUrl || !board.googlePhotosConnected) return;
+    if (albumUrl || !googlePhotosConnected) return;
     getJson<{ albumUrl: string | null }>(`/api/boards/${boardId}/google-photos`, hostKey)
       .then((data) => setAlbumUrl(data.albumUrl))
       .catch(() => setAlbumUrl(null));
-  }, [albumUrl, board.googlePhotosConnected, boardId, hostKey]);
+  }, [albumUrl, googlePhotosConnected, boardId, hostKey]);
 
   async function saveShareUrl(value: string) {
     setSavingShare(true);
@@ -445,7 +461,7 @@ function EndedPanel({
         </div>
       )}
 
-      {board.googlePhotosConnected && (
+      {googlePhotosConnected && (
         <div className="border-t border-line pt-5">
           <p className={labelClass}>Guest link</p>
           {board.googlePhotosShareUrl ? (

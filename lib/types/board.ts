@@ -13,7 +13,6 @@ export type Board = {
   // what makes a board survive a cleared browser, and what the admin page and
   // "my boards" list query against.
   ownerUid: string | null;
-  googlePhotosConnected: boolean;
   // Set once the archive has run AND the Storage copies have been deleted.
   // Doubles as the signal that photo.downloadUrl is now dead, so the gallery
   // must not try to render it - see HostBoardClient.
@@ -37,7 +36,6 @@ export function newBoardFields(input: {
     createdAt: Date.now(),
     endedAt: null,
     ownerUid: input.ownerUid,
-    googlePhotosConnected: false,
     googlePhotosArchivedAt: null,
     googlePhotosShareUrl: null,
   };
@@ -53,7 +51,6 @@ export function normaliseBoard(id: string, data: Partial<Board>): Board {
     createdAt: data.createdAt ?? Date.now(),
     endedAt: data.endedAt ?? null,
     ownerUid: data.ownerUid ?? null,
-    googlePhotosConnected: data.googlePhotosConnected ?? false,
     googlePhotosArchivedAt: data.googlePhotosArchivedAt ?? null,
     googlePhotosShareUrl: data.googlePhotosShareUrl ?? null,
   };
