@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 // Aperture mark - an outer lens ring in bone with the inner iris in
 // safelight red. Drawn inline rather than as a file so it inherits sizing
 // from wherever it's used.
@@ -11,13 +13,20 @@ export function LogoMark({ size = 24 }: { size?: number }) {
   );
 }
 
+// The wordmark sits in the header of every page except the home page, so it's
+// a link home by convention - without it /host, /join and /admin were all dead
+// ends with no way out except the browser's back button.
 export function Wordmark({ size = 24 }: { size?: number }) {
   return (
-    <div className="flex items-center gap-2 text-bone">
+    <Link
+      href="/"
+      aria-label="Recap home"
+      className="flex items-center gap-2 text-bone transition-opacity hover:opacity-70"
+    >
       <LogoMark size={size} />
       <span className="font-medium tracking-tight" style={{ fontSize: size * 0.85 }}>
         recap
       </span>
-    </div>
+    </Link>
   );
 }

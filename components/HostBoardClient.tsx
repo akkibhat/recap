@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import QRCode from "qrcode";
 import { useBoardById } from "@/lib/hooks/useBoard";
 import { usePhotos } from "@/lib/hooks/usePhotos";
@@ -184,9 +185,19 @@ export function HostBoardClient({ boardId }: { boardId: string }) {
 
   return (
     <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-6 px-4 py-6">
-      <div className="flex items-center justify-between border-b border-line pb-4">
-        <h1 className="text-xl font-medium tracking-tight">{board.title}</h1>
-        <Wordmark size={18} />
+      <div className="border-b border-line pb-4">
+        <div className="flex items-center justify-between gap-3">
+          {/* Points wherever the host actually came from: their board list if
+              they're signed in, the home page otherwise. */}
+          <Link
+            href={user ? "/boards" : "/"}
+            className="text-xs text-bone-dim underline underline-offset-4 hover:text-bone"
+          >
+            ← {user ? "Your boards" : "Home"}
+          </Link>
+          <Wordmark size={18} />
+        </div>
+        <h1 className="mt-3 text-xl font-medium tracking-tight">{board.title}</h1>
       </div>
 
       {board.endedAt ? (

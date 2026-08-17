@@ -72,9 +72,17 @@ export default function AdminPage() {
 
   return (
     <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-6 px-4 py-6">
-      <div className="flex items-center justify-between border-b border-line pb-4">
-        <h1 className="text-xl font-medium tracking-tight">Admin</h1>
-        <Wordmark size={18} />
+      <div className="border-b border-line pb-4">
+        <div className="flex items-center justify-between gap-3">
+          <Link
+            href="/boards"
+            className="text-xs text-bone-dim underline underline-offset-4 hover:text-bone"
+          >
+            ← Your boards
+          </Link>
+          <Wordmark size={18} />
+        </div>
+        <h1 className="mt-3 text-xl font-medium tracking-tight">Admin</h1>
       </div>
 
       <div className="flex items-center justify-between text-xs text-bone-faint">
