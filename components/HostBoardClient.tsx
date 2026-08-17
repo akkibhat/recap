@@ -4,7 +4,8 @@ import { useEffect, useState } from "react";
 import QRCode from "qrcode";
 import { useBoardById } from "@/lib/hooks/useBoard";
 import { usePhotos } from "@/lib/hooks/usePhotos";
-import { getHostKey } from "@/lib/hostIdentity";
+import { getHostKey, saveHostKey } from "@/lib/hostIdentity";
+import { useAuth } from "@/lib/hooks/useAuth";
 import { getOrCreateGuestId, getGuestName, setGuestName } from "@/lib/guestIdentity";
 import { postJson, getJson } from "@/lib/api";
 import { PhotoGallery } from "@/components/PhotoGallery";
@@ -26,9 +27,14 @@ export function HostBoardClient({ boardId }: { boardId: string }) {
   // Both read localStorage, unavailable during SSR - resolved at render
   // time (null on the server, real value on the client's first render)
   // rather than mirrored into state via an effect.
-  const [hostKey] = useState<string | null>(() =>
+  const { user, loading: authLoading } = useAuth();
+  const [hostKey, setHostKey] = useState<string | null>(() =>
     typeof window !== "undefined" ? getHostKey(boardId) : null
   );
+  // Only set when recovery has actually been tried and failed. "Currently
+  // recovering" is derived from it rather than stored, so the effect never
+  // calls setState synchronously in its own body.
+  const [recoveryFailed, setRecoveryFailed] = useState(false);
   const [guestId] = useState<string | null>(() =>
     typeof window !== "undefined" ? getOrCreateGuestId() : null
   );
@@ -58,6 +64,32 @@ export function HostBoardClient({ boardId }: { boardId: string }) {
       color: { dark: "#0a0a0a", light: "#ededed" },
     }).then(setQrDataUrl);
   }, [board]);
+
+  // The recovery path in practice. If this browser has no key for the board
+  // but the signed-in account owns it, fetch the key back and store it - so a
+  // host on a new phone, or after clearing their browser, simply lands on a
+  // working board rather than being told it isn't theirs.
+  useEffect(() => {
+    if (hostKey || !user || !board) return;
+    if (board.ownerUid !== user.uid) return;
+
+    let cancelled = false;
+    getJson<{ hostKey: string }>(`/api/boards/${boardId}/host-key`)
+      .then(({ hostKey: recovered }) => {
+        if (cancelled) return;
+        saveHostKey(boardId, recovered);
+        setHostKey(recovered);
+      })
+      .catch(() => {
+        // Nothing worth telling the host: a failed recovery just leaves them
+        // on the "not the host" screen, which is the honest outcome.
+        if (!cancelled) setRecoveryFailed(true);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [hostKey, user, board, boardId]);
 
   // Opening the dialog pre-ticks the archive box when an album is connected -
   // that's what connecting was for - but the host still has to pass through
@@ -113,6 +145,18 @@ export function HostBoardClient({ boardId }: { boardId: string }) {
   }
 
   if (!hostKey) {
+    // Recovery is possible, and hasn't failed yet, so a key may still arrive.
+    const recovering = Boolean(user && board.ownerUid === user.uid) && !recoveryFailed;
+
+    // Still resolving: auth hasn't restored yet, or recovery is in flight.
+    if (authLoading || recovering) {
+      return (
+        <div className="flex flex-1 items-center justify-center text-sm text-bone-dim">
+          Finding your board…
+        </div>
+      );
+    }
+
     return (
       <div className="flex flex-1 flex-col items-center justify-center gap-3 px-6 text-center">
         <span className="text-bone-faint">
@@ -122,6 +166,11 @@ export function HostBoardClient({ boardId }: { boardId: string }) {
         <p className="text-sm text-bone-dim">
           Join with the room code instead: <span className="text-safelight">{board.roomCode}</span>
         </p>
+        {!user && (
+          <p className="text-xs text-bone-faint">
+            If you started this board while signed in, sign in on the home page to get it back.
+          </p>
+        )}
       </div>
     );
   }

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { postJson } from "@/lib/api";
 import { saveHostKey } from "@/lib/hostIdentity";
 import { LogoMark } from "@/components/Logo";
+import { HostSignIn } from "@/components/HostSignIn";
 import { inputClass, buttonPrimaryClass, buttonSecondaryClass, labelClass } from "@/components/ui";
 
 type CreateBoardResponse = { boardId: string; roomCode: string; hostKey: string };
@@ -90,6 +91,10 @@ export default function Home() {
             Join board
           </button>
         </form>
+
+        <div className="mt-10 border-t border-line pt-6">
+          <HostSignIn />
+        </div>
       </div>
     </div>
   );

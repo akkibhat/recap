@@ -17,5 +17,8 @@ function getAdminApp(): App {
   });
 }
 
-export const adminDb = getFirestore(getAdminApp());
-export const adminStorage = getStorage(getAdminApp());
+// Exported so lib/hostAuth.ts can reach firebase-admin/auth off the same app
+// instance rather than initialising a second one.
+export const adminApp = getAdminApp();
+export const adminDb = getFirestore(adminApp);
+export const adminStorage = getStorage(adminApp);

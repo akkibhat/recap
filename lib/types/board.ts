@@ -7,6 +7,12 @@ export type Board = {
   title: string;
   createdAt: number;
   endedAt: number | null;
+  // The Google account that created this board, when the host was signed in.
+  // Null for boards made before sign-in existed, and for anyone who creates
+  // one without signing in - both keep working on the hostKey alone. This is
+  // what makes a board survive a cleared browser, and what the admin page and
+  // "my boards" list query against.
+  ownerUid: string | null;
   googlePhotosConnected: boolean;
   // Set once the archive has run AND the Storage copies have been deleted.
   // Doubles as the signal that photo.downloadUrl is now dead, so the gallery
@@ -20,12 +26,17 @@ export type Board = {
   googlePhotosShareUrl: string | null;
 };
 
-export function newBoardFields(input: { title: string; roomCode: string }): Omit<Board, "id"> {
+export function newBoardFields(input: {
+  title: string;
+  roomCode: string;
+  ownerUid: string | null;
+}): Omit<Board, "id"> {
   return {
     roomCode: input.roomCode,
     title: input.title,
     createdAt: Date.now(),
     endedAt: null,
+    ownerUid: input.ownerUid,
     googlePhotosConnected: false,
     googlePhotosArchivedAt: null,
     googlePhotosShareUrl: null,
@@ -41,6 +52,7 @@ export function normaliseBoard(id: string, data: Partial<Board>): Board {
     title: data.title ?? "Untitled board",
     createdAt: data.createdAt ?? Date.now(),
     endedAt: data.endedAt ?? null,
+    ownerUid: data.ownerUid ?? null,
     googlePhotosConnected: data.googlePhotosConnected ?? false,
     googlePhotosArchivedAt: data.googlePhotosArchivedAt ?? null,
     googlePhotosShareUrl: data.googlePhotosShareUrl ?? null,
