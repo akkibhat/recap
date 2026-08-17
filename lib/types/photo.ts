@@ -9,6 +9,12 @@ export type Photo = {
   id: string;
   storagePath: string;
   downloadUrl: string;
+  // A downscaled copy for the gallery. Null when the browser couldn't make one
+  // (an odd format, or an image already small enough to be its own thumbnail),
+  // in which case every read site falls back to the full-size downloadUrl - so
+  // a missing thumbnail costs bandwidth, never a broken frame.
+  thumbPath: string | null;
+  thumbUrl: string | null;
   caption: string;
   contributorName: string;
   contributorGuestId: string;
@@ -30,6 +36,12 @@ export type Photo = {
 export function newPhotoFields(input: {
   storagePath: string;
   downloadUrl: string;
+  // A downscaled copy for the gallery. Null when the browser couldn't make one
+  // (an odd format, or an image already small enough to be its own thumbnail),
+  // in which case every read site falls back to the full-size downloadUrl - so
+  // a missing thumbnail costs bandwidth, never a broken frame.
+  thumbPath: string | null;
+  thumbUrl: string | null;
   caption: string;
   contributorName: string;
   contributorGuestId: string;
@@ -37,6 +49,8 @@ export function newPhotoFields(input: {
   return {
     storagePath: input.storagePath,
     downloadUrl: input.downloadUrl,
+    thumbPath: input.thumbPath,
+    thumbUrl: input.thumbUrl,
     caption: input.caption,
     contributorName: input.contributorName,
     contributorGuestId: input.contributorGuestId,
@@ -53,6 +67,8 @@ export function normalisePhoto(id: string, data: Partial<Photo>): Photo {
     id,
     storagePath: data.storagePath ?? "",
     downloadUrl: data.downloadUrl ?? "",
+    thumbPath: data.thumbPath ?? null,
+    thumbUrl: data.thumbUrl ?? null,
     caption: data.caption ?? "",
     contributorName: data.contributorName ?? "Someone",
     contributorGuestId: data.contributorGuestId ?? "",
@@ -79,4 +95,10 @@ export function reactionCounts(photo: Photo): Record<ReactionEmoji, number> {
     counts[emoji]++;
   }
   return counts;
+}
+
+// What the gallery should load for a frame. Photos uploaded before thumbnails
+// existed, and any the browser couldn't downscale, simply serve the original.
+export function galleryUrl(photo: Photo): string {
+  return photo.thumbUrl ?? photo.downloadUrl;
 }

@@ -59,6 +59,8 @@ export async function archiveBoardToGooglePhotos(boardId: string): Promise<Archi
 
   // Pass 1 - upload. Anything that throws here aborts before a single delete,
   // leaving Storage exactly as it was.
+  // Both the original and its thumbnail, so pass 2 doesn't leave orphaned
+  // thumbnails behind for photos that are no longer in Storage.
   const uploadedPaths: string[] = [];
   for (const photo of livePhotos) {
     const [bytes] = await bucket.file(photo.storagePath).download();
@@ -66,6 +68,7 @@ export async function archiveBoardToGooglePhotos(boardId: string): Promise<Archi
 
     await addPhotoToAlbum(accessToken, album.id, bytes, filename);
     uploadedPaths.push(photo.storagePath);
+    if (photo.thumbPath) uploadedPaths.push(photo.thumbPath);
   }
 
   // Pass 2 - reclaim Storage, now that every photo is known to be safe in the

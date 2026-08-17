@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { REACTION_EMOJIS, reactionCounts, ReactionEmoji } from "@/lib/types/photo";
+import { REACTION_EMOJIS, reactionCounts, galleryUrl, ReactionEmoji } from "@/lib/types/photo";
 import type { RollPhoto } from "@/lib/hooks/usePhotos";
 import type { Comment } from "@/lib/types/comment";
 import { setReaction } from "@/lib/setReaction";
@@ -332,7 +332,7 @@ function PhotoFrame({
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
-            src={photo.downloadUrl}
+            src={galleryUrl(photo)}
             alt={photo.caption || "Party photo"}
             loading="lazy"
             className="aspect-2/3 w-full object-cover"
