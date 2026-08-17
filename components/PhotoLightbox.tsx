@@ -6,6 +6,7 @@ import type { RollPhoto } from "@/lib/hooks/usePhotos";
 import { setReaction } from "@/lib/setReaction";
 import { Comment, MAX_COMMENT_LENGTH } from "@/lib/types/comment";
 import { addComment, deleteOwnComment } from "@/lib/comments";
+import { updateCaption, MAX_CAPTION_LENGTH } from "@/lib/updateCaption";
 import { deleteJson } from "@/lib/api";
 import { inputClass } from "@/components/ui";
 
@@ -158,8 +159,15 @@ export function PhotoLightbox({
         onClick={(e) => e.stopPropagation()}
       >
         {/* Wrapping, not truncated - this is the only place the whole caption
-            is readable, since the strip has exactly one line for it. */}
-        {photo.caption && <p className="text-sm leading-relaxed text-bone">{photo.caption}</p>}
+            is readable, since the strip has exactly one line for it, and the
+            only place it can be edited. */}
+        <CaptionPanel
+          key={photo.id}
+          boardId={boardId}
+          photoId={photo.id}
+          caption={photo.caption}
+          canEdit={photo.contributorGuestId === guestId}
+        />
 
         <div className="flex items-center justify-between gap-3">
           <div className="flex gap-1">
@@ -309,6 +317,105 @@ function CommentThread({
       )}
 
       {error && <p className="text-xs text-safelight">{error}</p>}
+    </div>
+  );
+}
+
+// The caption, and its editor when the photo is yours. Keyed on photo id by the
+// caller so stepping to the next frame drops a half-finished edit rather than
+// carrying it across to someone else's photo.
+function CaptionPanel({
+  boardId,
+  photoId,
+  caption,
+  canEdit,
+}: {
+  boardId: string;
+  photoId: string;
+  caption: string;
+  canEdit: boolean;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(caption);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function handleSave(e: React.FormEvent) {
+    e.preventDefault();
+    if (saving) return;
+    setSaving(true);
+    setError(null);
+    try {
+      await updateCaption(boardId, photoId, draft);
+      setEditing(false);
+    } catch {
+      // Left in edit mode with the draft intact, so nothing typed is lost.
+      setError("Couldn't save that. Try again.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  if (editing) {
+    return (
+      <form onSubmit={handleSave} className="flex flex-col gap-2">
+        <input
+          autoFocus
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          placeholder="Caption"
+          maxLength={MAX_CAPTION_LENGTH}
+          disabled={saving}
+          className={`${inputClass} py-2 text-sm`}
+        />
+        <div className="flex items-center gap-3">
+          <button
+            type="submit"
+            disabled={saving}
+            className="text-xs text-safelight underline underline-offset-4 hover:text-bone disabled:opacity-30"
+          >
+            {saving ? "Saving…" : "Save"}
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setDraft(caption);
+              setEditing(false);
+              setError(null);
+            }}
+            disabled={saving}
+            className="text-xs text-bone-faint underline underline-offset-4 hover:text-bone disabled:opacity-30"
+          >
+            Cancel
+          </button>
+          {error && <span className="text-xs text-safelight">{error}</span>}
+        </div>
+      </form>
+    );
+  }
+
+  if (!caption) {
+    return canEdit ? (
+      <button
+        onClick={() => setEditing(true)}
+        className="self-start text-xs text-bone-faint underline underline-offset-4 hover:text-bone"
+      >
+        Add a caption
+      </button>
+    ) : null;
+  }
+
+  return (
+    <div className="flex items-start justify-between gap-3">
+      <p className="min-w-0 text-sm leading-relaxed text-bone">{caption}</p>
+      {canEdit && (
+        <button
+          onClick={() => setEditing(true)}
+          className="shrink-0 text-xs text-bone-faint underline underline-offset-4 hover:text-bone"
+        >
+          Edit
+        </button>
+      )}
     </div>
   );
 }

@@ -71,7 +71,17 @@ service cloud.firestore {
         // Third clause is undo, permitted only when the photo was removed by
         // its own contributor - so a guest can take back their own mistake but
         // cannot reverse a host's moderation, which sets deletedBy 'host'.
+        // Second clause is the uploader editing their own caption. Like the
+        // delete clauses it validates shape but cannot verify WHO is editing -
+        // there is no guest auth, and contributorGuestId is readable by anyone
+        // who can read the photo. One difference is worth naming: a delete can
+        // be undone, an edit overwrites the previous text.
         allow update: if request.resource.data.diff(resource.data).affectedKeys().hasOnly(['reactedBy'])
+                      || (
+                           request.resource.data.diff(resource.data).affectedKeys().hasOnly(['caption'])
+                           && request.resource.data.caption is string
+                           && request.resource.data.caption.size() <= 280
+                         )
                       || (
                            request.resource.data.diff(resource.data).affectedKeys().hasOnly(['deletedAt', 'deletedBy'])
                            && request.resource.data.deletedAt is number
