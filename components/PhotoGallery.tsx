@@ -207,7 +207,20 @@ function PhotoFrame({
         className="aspect-2/3 w-full object-cover"
       />
 
-      {photo.caption && <p className="pt-1.5 text-xs leading-snug text-bone">{photo.caption}</p>}
+      {/* Always rendered, and always exactly one line, even with no caption -
+          hence the non-breaking space holding the line box open.
+
+          Frames on a roll are identical by definition, but there's a
+          structural reason too: dealIntoColumns keeps the strips level by
+          assuming every frame is the same height, and it has no way to know
+          that some are a line shorter. Letting captions size the frame made
+          uncaptioned photos 22px shorter and the strips drift out of step.
+
+          Long captions truncate rather than wrap, for the same reason. The
+          full text belongs in the lightbox. */}
+      <p className="truncate pt-1.5 text-xs leading-snug text-bone">
+        {photo.caption || " "}
+      </p>
 
       <p className="truncate pt-1.5 font-mono text-[11px] tracking-widest text-edge uppercase">
         {photo.frameNumber} {photo.contributorName}
