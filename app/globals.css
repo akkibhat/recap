@@ -55,19 +55,23 @@ body {
 }
 
 /*
-  A punched sprocket edge, for the top and bottom of anything that should read
-  as a length of 35mm film.
+  Punched sprocket edges, for anything that should read as a length of 35mm
+  film. Two variants, because a strip running across the page is perforated
+  along its top and bottom, while one running down the page is perforated
+  along its left and right.
 
-  Drawn as a repeating pattern rather than a row of elements so it stays
-  width-independent - a strip can be any width and the holes just continue,
-  with no count to keep in sync and no extra DOM in a gallery that may hold
-  hundreds of frames. The stops are hard, so these are square holes rather
-  than a soft gradient.
+  Both are drawn as a repeating background rather than a row of elements, so
+  they stay independent of the length they have to cover - a strip can be any
+  size and the holes just continue, with no count to keep in sync and no extra
+  DOM in a gallery that may hold hundreds of frames. The stops are hard, so
+  these read as square holes rather than as a gradient.
 
-  The holes are painted in `ink` rather than left transparent: they need to
+  The holes are painted in `ink` rather than left transparent: they have to
   match the page behind the strip, and every surface these sit on is `ink`.
   If a strip is ever placed on `surface`, this needs a variant.
 */
+
+/* Horizontal run - used by the film leader on the host screen. */
 .sprocket-edge {
   height: 10px;
   flex-shrink: 0;
@@ -77,4 +81,22 @@ body {
     transparent 7px 17px
   );
   background-position: center;
+}
+
+/* Vertical run - the gutters either side of a strip in the gallery. The
+   gutter is wider than the hole so the perforations sit inset from the edge
+   of the film, as they do on the real thing. A single tile is sized and
+   repeated down the axis, which keeps each hole exactly 9px regardless of how
+   tall the column grows. */
+.sprocket-column {
+  width: 15px;
+  flex-shrink: 0;
+  background-image: linear-gradient(
+    to bottom,
+    var(--color-ink) 0 9px,
+    transparent 9px 20px
+  );
+  background-size: 7px 20px;
+  background-repeat: repeat-y;
+  background-position: center top;
 }
