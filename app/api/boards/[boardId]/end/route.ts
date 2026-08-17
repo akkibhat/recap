@@ -24,6 +24,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ boa
 
   let archiveError: string | null = null;
   let archivedCount = 0;
+  let skippedCount = 0;
   let albumUrl: string | null = null;
   let archivedAt: number | null = null;
 
@@ -35,6 +36,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ boa
     try {
       const result = await archiveBoardToGooglePhotos(boardId);
       archivedCount = result.archivedCount;
+      skippedCount = result.skippedCount;
       albumUrl = result.albumUrl;
       // Only stamped when photos actually moved. The gallery keys off this to
       // know the Storage copies are gone, so a failed or no-op archive must
@@ -54,5 +56,5 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ boa
     googlePhotosArchivedAt: archivedAt,
   });
 
-  return NextResponse.json({ ok: true, archiveError, archivedCount, albumUrl });
+  return NextResponse.json({ ok: true, archiveError, archivedCount, skippedCount, albumUrl });
 }

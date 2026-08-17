@@ -72,19 +72,20 @@ export async function createAlbum(accessToken: string, title: string): Promise<{
   return { id: data.id, productUrl: data.productUrl };
 }
 
-// Two-step per the Photos Library API: upload raw bytes for an upload
-// token, then batchCreate the actual media item (directly into the album).
-export async function addPhotoToAlbum(
+// Google's own cap on mediaItems:batchCreate.
+export const MEDIA_ITEM_BATCH_LIMIT = 50;
+
+// Step one of two: hand Google the bytes and get back a token standing in for
+// them. Nothing exists in the library yet at this point.
+export async function uploadPhotoBytes(
   accessToken: string,
-  albumId: string,
   imageBytes: Buffer,
-  filename: string,
   // Google rejects the upload if this doesn't match the bytes, so it has to be
   // the type recorded at upload rather than a hardcoded guess. Videos were
   // silently impossible while this said image/jpeg.
   contentType: string
-): Promise<void> {
-  const uploadRes = await fetch("https://photoslibrary.googleapis.com/v1/uploads", {
+): Promise<string> {
+  const res = await fetch("https://photoslibrary.googleapis.com/v1/uploads", {
     method: "POST",
     headers: {
       Authorization: `Bearer ${accessToken}`,
@@ -94,16 +95,57 @@ export async function addPhotoToAlbum(
     },
     body: new Uint8Array(imageBytes),
   });
-  if (!uploadRes.ok) throw new Error(`Google Photos byte upload failed: ${await uploadRes.text()}`);
-  const uploadToken = await uploadRes.text();
+  if (!res.ok) throw new Error(`Google Photos byte upload failed: ${await res.text()}`);
+  return res.text();
+}
 
-  const createRes = await fetch("https://photoslibrary.googleapis.com/v1/mediaItems:batchCreate", {
+export type CreatedMediaItem = { uploadToken: string; mediaItemId: string | null };
+
+// Step two: turn up to 50 upload tokens into album entries in a single call.
+// This used to run once per photo, so a hundred-photo board made two hundred
+// round trips to Google instead of a hundred and two.
+//
+// Returns each token's resulting media item id so the caller can record which
+// photos are already in the album, which is what makes a retry skip them.
+export async function createMediaItems(
+  accessToken: string,
+  albumId: string,
+  items: { uploadToken: string; filename: string }[]
+): Promise<CreatedMediaItem[]> {
+  if (items.length === 0) return [];
+  if (items.length > MEDIA_ITEM_BATCH_LIMIT) {
+    throw new Error(`batchCreate accepts at most ${MEDIA_ITEM_BATCH_LIMIT} items`);
+  }
+
+  const res = await fetch("https://photoslibrary.googleapis.com/v1/mediaItems:batchCreate", {
     method: "POST",
     headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
     body: JSON.stringify({
       albumId,
-      newMediaItems: [{ simpleMediaItem: { uploadToken, fileName: filename } }],
+      newMediaItems: items.map((item) => ({
+        simpleMediaItem: { uploadToken: item.uploadToken, fileName: item.filename },
+      })),
     }),
   });
-  if (!createRes.ok) throw new Error(`Google Photos media item creation failed: ${await createRes.text()}`);
+  if (!res.ok) throw new Error(`Google Photos media item creation failed: ${await res.text()}`);
+
+  const data = await res.json();
+  const results: { uploadToken?: string; status?: { message?: string }; mediaItem?: { id?: string } }[] =
+    data.newMediaItemResults ?? [];
+
+  // A batch can partially succeed: the call returns 200 and reports per-item
+  // status. Treating the whole batch as successful because the HTTP call was
+  // would mark photos archived that Google actually rejected - and this
+  // archive deletes Storage copies on success.
+  const failed = results.filter((r) => r.status?.message && r.status.message !== "Success");
+  if (failed.length > 0) {
+    throw new Error(
+      `Google Photos rejected ${failed.length} of ${results.length}: ${failed[0].status?.message}`
+    );
+  }
+
+  return results.map((r) => ({
+    uploadToken: r.uploadToken ?? "",
+    mediaItemId: r.mediaItem?.id ?? null,
+  }));
 }
