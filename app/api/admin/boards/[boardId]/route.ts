@@ -45,8 +45,22 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ b
     await batch.commit();
   }
 
+  // Deleting a document in Firestore does NOT delete its subcollections, so
+  // comments have to be cleared explicitly. Skipping this would leave orphaned
+  // comments that nothing can ever reach or remove.
+  const commentsSnap = await adminDb.collection("boards").doc(boardId).collection("comments").get();
+  for (let i = 0; i < commentsSnap.docs.length; i += BATCH_LIMIT) {
+    const batch = adminDb.batch();
+    for (const doc of commentsSnap.docs.slice(i, i + BATCH_LIMIT)) batch.delete(doc.ref);
+    await batch.commit();
+  }
+
   await adminDb.collection("boardSecrets").doc(boardId).delete();
   await adminDb.collection("boards").doc(boardId).delete();
 
-  return NextResponse.json({ ok: true, deletedPhotos: photosSnap.size });
+  return NextResponse.json({
+    ok: true,
+    deletedPhotos: photosSnap.size,
+    deletedComments: commentsSnap.size,
+  });
 }

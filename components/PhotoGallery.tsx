@@ -3,10 +3,12 @@
 import { useEffect, useState } from "react";
 import { REACTION_EMOJIS, reactionCounts, ReactionEmoji } from "@/lib/types/photo";
 import type { RollPhoto } from "@/lib/hooks/usePhotos";
+import type { Comment } from "@/lib/types/comment";
 import { setReaction } from "@/lib/setReaction";
 import { deleteOwnPhoto, restoreOwnPhoto } from "@/lib/deletePhoto";
 import { deleteJson, postJson } from "@/lib/api";
 import { PhotoLightbox } from "@/components/PhotoLightbox";
+import { useCommentsByPhoto } from "@/lib/hooks/useComments";
 
 const EMOJI_GLYPH: Record<ReactionEmoji, string> = {
   heart: "❤️",
@@ -76,6 +78,7 @@ function dealIntoColumns(frames: RollPhoto[], columnCount: number): RollPhoto[][
 export function PhotoGallery({
   photos,
   guestId,
+  guestName,
   boardId,
   // Present only on the host's own screen. Its presence is what turns on
   // moderation - the ability to remove someone else's photo, not just your own.
@@ -83,10 +86,12 @@ export function PhotoGallery({
 }: {
   photos: RollPhoto[];
   guestId: string;
+  guestName: string;
   boardId: string;
   hostKey?: string | null;
 }) {
   const columnCount = useColumnCount();
+  const { byPhoto: commentsByPhoto } = useCommentsByPhoto(boardId);
   // The removed photo itself, not just its id: once it leaves the live query
   // there is nothing left to look its details up from.
   const [removed, setRemoved] = useState<{ photo: RollPhoto; wasMine: boolean } | null>(null);
@@ -128,6 +133,7 @@ export function PhotoGallery({
             boardId={boardId}
             hostKey={hostKey}
             onRemoved={(photo, wasMine) => setRemoved({ photo, wasMine })}
+            commentsByPhoto={commentsByPhoto}
             onOpen={(photo) => setOpenIndex(frames.findIndex((f) => f.id === photo.id))}
           />
         ))}
@@ -138,6 +144,10 @@ export function PhotoGallery({
           frames={frames}
           index={openIndex}
           guestId={guestId}
+          guestName={guestName}
+          boardId={boardId}
+          hostKey={hostKey}
+          comments={commentsByPhoto.get(frames[openIndex].id) ?? []}
           onNavigate={setOpenIndex}
           onClose={() => setOpenIndex(null)}
           canRemove={(photo) => photo.contributorGuestId === guestId || Boolean(hostKey)}
@@ -229,6 +239,7 @@ function FilmStrip({
   hostKey,
   onRemoved,
   onOpen,
+  commentsByPhoto,
 }: {
   frames: RollPhoto[];
   guestId: string;
@@ -236,6 +247,7 @@ function FilmStrip({
   hostKey?: string | null;
   onRemoved: (photo: RollPhoto, wasMine: boolean) => void;
   onOpen: (photo: RollPhoto) => void;
+  commentsByPhoto: Map<string, Comment[]>;
 }) {
   return (
     <div className="flex min-w-0 flex-1 bg-frame">
@@ -250,6 +262,7 @@ function FilmStrip({
             hostKey={hostKey}
             onRemoved={onRemoved}
             onOpen={onOpen}
+            commentCount={(commentsByPhoto.get(photo.id) ?? []).length}
           />
         ))}
       </div>
@@ -265,6 +278,7 @@ function PhotoFrame({
   hostKey,
   onRemoved,
   onOpen,
+  commentCount,
 }: {
   photo: RollPhoto;
   guestId: string;
@@ -272,6 +286,7 @@ function PhotoFrame({
   hostKey?: string | null;
   onRemoved: (photo: RollPhoto, wasMine: boolean) => void;
   onOpen: (photo: RollPhoto) => void;
+  commentCount: number;
 }) {
   const counts = reactionCounts(photo);
   const myReaction = photo.reactedBy[guestId];
@@ -371,6 +386,17 @@ function PhotoFrame({
             {counts[emoji] > 0 && <span className="tabular-nums">{counts[emoji]}</span>}
           </button>
         ))}
+
+        {/* Not a button: the whole frame already opens the lightbox, so this
+            only has to signal that there's a conversation to find. */}
+        {commentCount > 0 && (
+          <span
+            aria-label={`${commentCount} comment${commentCount === 1 ? "" : "s"}`}
+            className="flex shrink-0 items-center gap-0.5 px-1 py-1.5 font-mono text-[11px] text-bone-faint"
+          >
+            {commentCount} ”
+          </span>
+        )}
       </div>
     </div>
   );

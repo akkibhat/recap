@@ -354,7 +354,7 @@ export function HostBoardClient({ boardId }: { boardId: string }) {
         ))}
 
       {photosLiveInStorage && (
-        <PhotoGallery photos={photos} guestId={guestId} boardId={boardId} hostKey={hostKey} />
+        <PhotoGallery photos={photos} guestId={guestId} guestName={guestName} boardId={boardId} hostKey={hostKey} />
       )}
     </div>
   );

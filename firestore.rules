@@ -20,6 +20,49 @@ service cloud.firestore {
       allow list: if request.auth != null && resource.data.ownerUid == request.auth.uid;
 
       allow write: if false;
+
+      // Comments sit under their board rather than in a top-level collection
+      // with a boardId field, so that listing them is scoped by path. A
+      // top-level version could only be queried with a where("boardId")
+      // filter, and list rules can't inspect filters - so permitting the query
+      // would permit enumerating every comment on the project. Here a caller
+      // must already know a board id to read anything at all.
+      match /comments/{commentId} {
+        allow read: if true;
+
+        // Same trust model as uploading a photo - no auth - but the shape is
+        // validated so a malformed write can't corrupt what everyone reads.
+        allow create: if request.resource.data.keys().hasAll(
+                          ['photoId', 'body', 'authorName', 'authorGuestId',
+                           'createdAt', 'deletedAt', 'deletedBy']
+                        )
+                      && request.resource.data.photoId is string
+                      && request.resource.data.body is string
+                      && request.resource.data.body.size() > 0
+                      && request.resource.data.body.size() <= 500
+                      && request.resource.data.authorName is string
+                      && request.resource.data.authorName.size() <= 40
+                      && request.resource.data.deletedAt == null
+                      && request.resource.data.deletedBy == null;
+
+        // Soft delete and undo, mirroring photos exactly: an author may remove
+        // and restore their own, and nothing else about a comment can change
+        // once written - so a comment can't be edited into something else
+        // after people have read it. A host removal sets deletedBy 'host',
+        // which no authorGuestId equals, so a client can't reverse one.
+        allow update: if (
+                        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['deletedAt', 'deletedBy'])
+                        && request.resource.data.deletedAt is number
+                        && request.resource.data.deletedBy == resource.data.authorGuestId
+                      )
+                      || (
+                        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['deletedAt', 'deletedBy'])
+                        && request.resource.data.deletedAt == null
+                        && resource.data.deletedBy == resource.data.authorGuestId
+                      );
+
+        allow delete: if false;
+      }
     }
 
     // No client access whatsoever - only the Admin SDK (server API routes)

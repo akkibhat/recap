@@ -1,9 +1,13 @@
 "use client";
 
-import { useCallback, useEffect } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { REACTION_EMOJIS, reactionCounts, ReactionEmoji } from "@/lib/types/photo";
 import type { RollPhoto } from "@/lib/hooks/usePhotos";
 import { setReaction } from "@/lib/setReaction";
+import { Comment, MAX_COMMENT_LENGTH } from "@/lib/types/comment";
+import { addComment, deleteOwnComment } from "@/lib/comments";
+import { deleteJson } from "@/lib/api";
+import { inputClass } from "@/components/ui";
 
 const EMOJI_GLYPH: Record<ReactionEmoji, string> = {
   heart: "❤️",
@@ -30,6 +34,10 @@ export function PhotoLightbox({
   frames,
   index,
   guestId,
+  guestName,
+  boardId,
+  hostKey,
+  comments,
   onNavigate,
   onClose,
   onRemove,
@@ -38,6 +46,10 @@ export function PhotoLightbox({
   frames: RollPhoto[];
   index: number;
   guestId: string;
+  guestName: string;
+  boardId: string;
+  hostKey?: string | null;
+  comments: Comment[];
   onNavigate: (nextIndex: number) => void;
   onClose: () => void;
   onRemove: (photo: RollPhoto) => void;
@@ -176,10 +188,127 @@ export function PhotoLightbox({
           )}
         </div>
 
+        <CommentThread
+          key={photo.id}
+          boardId={boardId}
+          photoId={photo.id}
+          comments={comments}
+          guestId={guestId}
+          guestName={guestName}
+          hostKey={hostKey}
+        />
+
         <p className="text-center font-mono text-[11px] text-bone-faint">
           {index + 1} of {frames.length}
         </p>
       </div>
+    </div>
+  );
+}
+
+// The thread for one frame. Keyed on photo id by the caller so moving to the
+// next frame resets the draft rather than carrying a half-typed comment over.
+function CommentThread({
+  boardId,
+  photoId,
+  comments,
+  guestId,
+  guestName,
+  hostKey,
+}: {
+  boardId: string;
+  photoId: string;
+  comments: Comment[];
+  guestId: string;
+  guestName: string;
+  hostKey?: string | null;
+}) {
+  const [draft, setDraft] = useState("");
+  const [sending, setSending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    const body = draft.trim();
+    if (!body || sending) return;
+
+    setSending(true);
+    setError(null);
+    try {
+      await addComment({ boardId, photoId, body, authorName: guestName, authorGuestId: guestId });
+      // Cleared only on success, so a failed send doesn't lose what was typed.
+      setDraft("");
+    } catch {
+      setError("Couldn't post that. Try again.");
+    } finally {
+      setSending(false);
+    }
+  }
+
+  async function handleRemove(comment: Comment) {
+    const mine = comment.authorGuestId === guestId;
+    try {
+      if (mine) await deleteOwnComment(boardId, comment.id, guestId);
+      else await deleteJson(`/api/boards/${boardId}/comments/${comment.id}`, hostKey ?? undefined);
+    } catch {
+      // The comment simply stays; the live query never changed.
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-2 border-t border-line pt-3">
+      {comments.length > 0 && (
+        // Capped height so a long thread can't push the photo off screen on a
+        // phone - the picture is still the point of this view.
+        <ul className="flex max-h-40 flex-col gap-2 overflow-y-auto">
+          {comments.map((comment) => {
+            const mine = comment.authorGuestId === guestId;
+            return (
+              <li key={comment.id} className="flex items-start justify-between gap-2">
+                <p className="min-w-0 text-xs leading-relaxed text-bone">
+                  <span className="font-mono text-[11px] tracking-widest text-edge uppercase">
+                    {comment.authorName}
+                  </span>{" "}
+                  {comment.body}
+                </p>
+                {(mine || hostKey) && (
+                  <button
+                    onClick={() => handleRemove(comment)}
+                    aria-label={mine ? "Remove your comment" : "Remove this comment"}
+                    className="shrink-0 text-[11px] text-bone-faint hover:text-safelight"
+                  >
+                    ✕
+                  </button>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+      )}
+
+      {guestName ? (
+        <form onSubmit={handleSubmit} className="flex gap-2">
+          <input
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            placeholder="Say something"
+            maxLength={MAX_COMMENT_LENGTH}
+            disabled={sending}
+            className={`${inputClass} py-2 text-xs`}
+          />
+          <button
+            type="submit"
+            disabled={!draft.trim() || sending}
+            className="shrink-0 text-xs text-safelight underline underline-offset-4 hover:text-bone disabled:opacity-30"
+          >
+            {sending ? "Posting…" : "Post"}
+          </button>
+        </form>
+      ) : (
+        <p className="text-[11px] text-bone-faint">Set your name to comment.</p>
+      )}
+
+      {error && <p className="text-xs text-safelight">{error}</p>}
     </div>
   );
 }
