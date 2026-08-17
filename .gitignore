@@ -39,6 +39,9 @@ yarn-error.log*
 *service-account*.json
 firebase-service-account.json
 
+# local working notes, not part of the repo
+HISTORY.md
+
 # vercel
 .vercel
 
