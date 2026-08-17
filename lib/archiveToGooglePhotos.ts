@@ -1,5 +1,5 @@
 import { adminDb, adminStorage } from "@/lib/firebase/admin";
-import { normalisePhoto } from "@/lib/types/photo";
+import { normalisePhoto, isVisible } from "@/lib/types/photo";
 import { normaliseBoardSecret } from "@/lib/types/boardSecret";
 import { refreshAccessToken, addPhotoToAlbum } from "@/lib/googlePhotos";
 
@@ -40,6 +40,12 @@ export async function archiveBoardToGooglePhotos(boardId: string): Promise<Archi
   const uploadedPaths: string[] = [];
   for (const doc of photosSnap.docs) {
     const photo = normalisePhoto(doc.id, doc.data());
+    // Deleted photos are skipped on both counts: they must not be pushed into
+    // the album, and pass 2 must not delete their Storage copy - a soft delete
+    // is meant to stay recoverable, and this is the one code path in the app
+    // that removes bytes for good.
+    if (!isVisible(photo)) continue;
+
     const [bytes] = await bucket.file(photo.storagePath).download();
     const filename = photo.storagePath.split("/").pop() ?? `${doc.id}.jpg`;
 

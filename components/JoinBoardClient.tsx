@@ -71,7 +71,8 @@ export function JoinBoardClient({ roomCode }: { roomCode: string }) {
         <Wordmark size={18} />
       </div>
       <PhotoUploadForm boardId={board.id} guestId={guestId} guestName={guestName} />
-      <PhotoGallery photos={photos} guestId={guestId} />
+      {/* No hostKey here: a guest can remove their own photo and nothing else. */}
+      <PhotoGallery photos={photos} guestId={guestId} boardId={board.id} />
     </div>
   );
 }

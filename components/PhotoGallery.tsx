@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import { Photo, REACTION_EMOJIS, reactionCounts, ReactionEmoji } from "@/lib/types/photo";
 import { setReaction } from "@/lib/setReaction";
+import { deleteOwnPhoto } from "@/lib/deletePhoto";
+import { deleteJson } from "@/lib/api";
 
 const EMOJI_GLYPH: Record<ReactionEmoji, string> = {
   heart: "❤️",
@@ -78,7 +80,19 @@ function dealIntoColumns(frames: Frame[], columnCount: number): Frame[][] {
   return columns.filter((column) => column.length > 0);
 }
 
-export function PhotoGallery({ photos, guestId }: { photos: Photo[]; guestId: string }) {
+export function PhotoGallery({
+  photos,
+  guestId,
+  boardId,
+  // Present only on the host's own screen. Its presence is what turns on
+  // moderation - the ability to remove someone else's photo, not just your own.
+  hostKey,
+}: {
+  photos: Photo[];
+  guestId: string;
+  boardId: string;
+  hostKey?: string | null;
+}) {
   const columnCount = useColumnCount();
 
   if (photos.length === 0) {
@@ -102,7 +116,13 @@ export function PhotoGallery({ photos, guestId }: { photos: Photo[]; guestId: st
   return (
     <div className="flex gap-3">
       {dealIntoColumns(frames, columnCount).map((column, index) => (
-        <FilmStrip key={index} frames={column} guestId={guestId} />
+        <FilmStrip
+          key={index}
+          frames={column}
+          guestId={guestId}
+          boardId={boardId}
+          hostKey={hostKey}
+        />
       ))}
     </div>
   );
@@ -113,13 +133,30 @@ export function PhotoGallery({ photos, guestId }: { photos: Photo[]; guestId: st
 // perforations run unbroken past the rebate between one frame and the next -
 // which is the whole reason this reads as a roll rather than as a stack of
 // separate cards.
-function FilmStrip({ frames, guestId }: { frames: Frame[]; guestId: string }) {
+function FilmStrip({
+  frames,
+  guestId,
+  boardId,
+  hostKey,
+}: {
+  frames: Frame[];
+  guestId: string;
+  boardId: string;
+  hostKey?: string | null;
+}) {
   return (
     <div className="flex min-w-0 flex-1 bg-frame">
       <div className="sprocket-column" />
       <div className="min-w-0 flex-1 py-1.5">
         {frames.map(({ photo, number }) => (
-          <PhotoFrame key={photo.id} photo={photo} number={number} guestId={guestId} />
+          <PhotoFrame
+            key={photo.id}
+            photo={photo}
+            number={number}
+            guestId={guestId}
+            boardId={boardId}
+            hostKey={hostKey}
+          />
         ))}
       </div>
       <div className="sprocket-column" />
@@ -131,13 +168,41 @@ function PhotoFrame({
   photo,
   number,
   guestId,
+  boardId,
+  hostKey,
 }: {
   photo: Photo;
   number: string;
   guestId: string;
+  boardId: string;
+  hostKey?: string | null;
 }) {
   const counts = reactionCounts(photo);
   const myReaction = photo.reactedBy[guestId];
+  const [removing, setRemoving] = useState(false);
+
+  // Your own photo goes through the client path; anything else needs the host
+  // key and the API route, which is the only one of the two actually enforced.
+  const isMine = photo.contributorGuestId === guestId;
+  const canRemove = isMine || Boolean(hostKey);
+
+  async function handleRemove() {
+    if (!confirm(isMine ? "Remove your photo from the roll?" : "Remove this photo from the roll?")) {
+      return;
+    }
+    setRemoving(true);
+    try {
+      if (isMine) {
+        await deleteOwnPhoto(photo.id, guestId);
+      } else {
+        await deleteJson(`/api/boards/${boardId}/photos/${photo.id}`, hostKey ?? undefined);
+      }
+      // No success branch: the photo drops out of the live query, so this
+      // component unmounts on its own.
+    } catch {
+      setRemoving(false);
+    }
+  }
 
   return (
     <div className="py-1.5">
@@ -175,6 +240,18 @@ function PhotoFrame({
             {counts[emoji] > 0 && <span className="tabular-nums">{counts[emoji]}</span>}
           </button>
         ))}
+
+        {canRemove && (
+          <button
+            onClick={handleRemove}
+            disabled={removing}
+            aria-label={isMine ? "Remove your photo" : "Remove this photo"}
+            title={isMine ? "Remove your photo" : "Remove this photo"}
+            className="flex min-w-7 shrink-0 items-center justify-center rounded-sm px-0.5 py-1.5 text-xs text-bone-faint hover:text-safelight disabled:opacity-30"
+          >
+            {removing ? "…" : "✕"}
+          </button>
+        )}
       </div>
     </div>
   );

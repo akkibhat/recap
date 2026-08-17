@@ -236,7 +236,9 @@ export function HostBoardClient({ boardId }: { boardId: string }) {
           </form>
         ))}
 
-      {photosLiveInStorage && <PhotoGallery photos={photos} guestId={guestId} />}
+      {photosLiveInStorage && (
+        <PhotoGallery photos={photos} guestId={guestId} boardId={boardId} hostKey={hostKey} />
+      )}
     </div>
   );
 }

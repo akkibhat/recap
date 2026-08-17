@@ -14,6 +14,15 @@ export type Photo = {
   // guestId -> the single reaction that guest picked for this photo (one per guest, can change)
   reactedBy: Record<string, ReactionEmoji>;
   googlePhotosMediaItemId: string | null;
+  // Soft delete. Deleting hides a photo everywhere a guest can see it, but
+  // never removes the doc or the Storage object - partly so a misfire is
+  // recoverable from the admin page, and partly because a guest's claim to
+  // own a photo is only a localStorage id and therefore spoofable. Nothing a
+  // client can do here destroys anything.
+  deletedAt: number | null;
+  // The guestId that deleted it, or "host" when it came from the host's own
+  // moderation route.
+  deletedBy: string | null;
 };
 
 export function newPhotoFields(input: {
@@ -34,6 +43,8 @@ export function newPhotoFields(input: {
     uploadedAt: Date.now(),
     reactedBy: {},
     googlePhotosMediaItemId: null,
+    deletedAt: null,
+    deletedBy: null,
   };
 }
 
@@ -49,7 +60,16 @@ export function normalisePhoto(id: string, data: Partial<Photo>): Photo {
     uploadedAt: data.uploadedAt ?? Date.now(),
     reactedBy: data.reactedBy ?? {},
     googlePhotosMediaItemId: data.googlePhotosMediaItemId ?? null,
+    deletedAt: data.deletedAt ?? null,
+    deletedBy: data.deletedBy ?? null,
   };
+}
+
+// Every read path should go through this rather than testing `deletedAt`
+// directly, so there's one definition of "still on the roll" to change if
+// deletion ever grows a second state (hidden, reported, expired).
+export function isVisible(photo: Photo): boolean {
+  return photo.deletedAt === null;
 }
 
 // Counts are always derived from reactedBy rather than stored separately,

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import * as archiver from "archiver";
 import { adminDb, adminStorage } from "@/lib/firebase/admin";
 import { requireHostKey } from "@/lib/hostAuth";
-import { normalisePhoto } from "@/lib/types/photo";
+import { normalisePhoto, isVisible } from "@/lib/types/photo";
 import { normaliseBoard } from "@/lib/types/board";
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ boardId: string }> }) {
@@ -23,6 +23,10 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ boar
 
   for (const doc of photosSnap.docs) {
     const photo = normalisePhoto(doc.id, doc.data());
+    // A deleted photo shouldn't reappear in the zip - that would be the one
+    // route by which something a guest removed still gets handed out.
+    if (!isVisible(photo)) continue;
+
     const [bytes] = await bucket.file(photo.storagePath).download();
     const filename = photo.storagePath.split("/").pop() ?? `${doc.id}.jpg`;
     archive.append(bytes, { name: `${photo.contributorName}-${filename}` });

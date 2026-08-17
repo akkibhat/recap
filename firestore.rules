@@ -41,8 +41,23 @@ service cloud.firestore {
       // guarantee a guest only edits their own entry, only that reactedBy is
       // the sole field anyone is ever allowed to touch after creation. That's
       // the honest boundary available without adding a full auth system.
-      allow update: if request.resource.data.diff(resource.data).affectedKeys().hasOnly(['reactedBy']);
+      //
+      // The second clause is a guest deleting their own photo. It requires the
+      // claimed deleter to match the recorded contributor, so a client can't
+      // casually remove someone else's photo - but since both are the same
+      // spoofable localStorage id, that's a speed bump, not a guarantee. It's
+      // only safe because deletion here is soft: this write hides a photo, it
+      // never destroys one. The host's own moderation goes through an API
+      // route with the host key instead, which the Admin SDK enforces properly.
+      allow update: if request.resource.data.diff(resource.data).affectedKeys().hasOnly(['reactedBy'])
+                    || (
+                         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['deletedAt', 'deletedBy'])
+                         && request.resource.data.deletedAt is number
+                         && request.resource.data.deletedBy == resource.data.contributorGuestId
+                       );
 
+      // Still never a hard delete from a client. Restoring, and any eventual
+      // permanent removal, are Admin SDK only - see the admin routes.
       allow delete: if false;
     }
   }
