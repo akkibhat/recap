@@ -148,9 +148,24 @@ export function HostBoardClient({ boardId }: { boardId: string }) {
               <img src={qrDataUrl} alt="QR code to join" className="block" />
             </div>
           )}
-          <div className="text-center">
-            <p className={labelClass}>Room code</p>
-            <p className="mt-1 text-4xl font-medium tracking-[0.3em] text-safelight">{board.roomCode}</p>
+          {/* The room code as a length of film leader - the strip of exposed
+              film at the head of a roll, which is where the stock and speed
+              are printed. It's the one place in the app that gets the full
+              sprocketed treatment, since it's the hero of the host screen. */}
+          <div className="w-full max-w-xs bg-frame">
+            <div className="sprocket-edge" />
+            <div className="px-4 py-5 text-center">
+              <p className="font-mono text-[11px] tracking-[0.16em] text-edge">RECAP 400</p>
+              <p className="mt-2 text-4xl font-medium tracking-[0.3em] text-safelight">
+                {board.roomCode}
+              </p>
+              <p className="mt-2 font-mono text-[11px] tracking-widest text-bone-faint">
+                {photos.length === 0
+                  ? "NO FRAMES YET"
+                  : `${photos.length} FRAME${photos.length === 1 ? "" : "S"} SO FAR`}
+              </p>
+            </div>
+            <div className="sprocket-edge" />
           </div>
           <p className="text-xs text-bone-faint">Scan, or go to /join/{board.roomCode}</p>
 
@@ -176,7 +191,7 @@ export function HostBoardClient({ boardId }: { boardId: string }) {
               Download all as zip
             </a>
             <button onClick={openEndDialog} disabled={ending} className={buttonDangerClass}>
-              End board
+              Develop the roll
             </button>
           </div>
           {error && <p className="text-sm text-safelight">{error}</p>}
@@ -264,9 +279,9 @@ function EndBoardDialog({
         className="w-full max-w-sm border border-line bg-surface p-6"
       >
         <h2 id="end-board-title" className="text-lg font-medium tracking-tight">
-          End this board?
+          Develop this roll?
         </h2>
-        <p className="mt-2 text-sm text-bone-dim">Guests won&apos;t be able to add more photos.</p>
+        <p className="mt-2 text-sm text-bone-dim">Guests won&apos;t be able to add more frames.</p>
 
         {googlePhotosConnected && (
           <label className="mt-5 flex cursor-pointer gap-3 border border-line p-3">
@@ -294,7 +309,7 @@ function EndBoardDialog({
             Cancel
           </button>
           <button onClick={onConfirm} disabled={ending} className={buttonDangerClass}>
-            {ending ? "Ending…" : "End board"}
+            {ending ? "Developing…" : "Develop the roll"}
           </button>
         </div>
       </div>
@@ -346,13 +361,13 @@ function EndedPanel({
   return (
     <div className="flex flex-col gap-5 border border-line bg-surface p-6">
       <div>
-        <p className={labelClass}>Board ended</p>
+        <p className={labelClass}>Roll developed</p>
         <p className="mt-1 text-sm text-bone-dim">
           {board.googlePhotosArchivedAt
-            ? `Photos archived to Google Photos${
-                endResult ? ` — ${endResult.archivedCount} in total` : ""
-              }, and removed from Recap.`
-            : "Photos are still stored in Recap. Nothing was archived."}
+            ? `${
+                endResult ? `${endResult.archivedCount} frames` : "Every frame"
+              } archived to Google Photos, and removed from Recap.`
+            : "Every frame is still stored in Recap. Nothing was archived."}
         </p>
         {endResult?.archiveError && (
           <p className="mt-2 text-sm text-safelight">
