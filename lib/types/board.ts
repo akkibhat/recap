@@ -8,6 +8,16 @@ export type Board = {
   createdAt: number;
   endedAt: number | null;
   googlePhotosConnected: boolean;
+  // Set once the archive has run AND the Storage copies have been deleted.
+  // Doubles as the signal that photo.downloadUrl is now dead, so the gallery
+  // must not try to render it - see HostBoardClient.
+  googlePhotosArchivedAt: number | null;
+  // A share link the host pasted in by hand. Google removed the sharing scope
+  // on 2025-03-31 (albums.share now 403s), so there is no way to generate this
+  // from code - the host taps Share -> Create link in the Google Photos app and
+  // pastes the result. Public on purpose: this is the one album link that
+  // actually opens for guests.
+  googlePhotosShareUrl: string | null;
 };
 
 export function newBoardFields(input: { title: string; roomCode: string }): Omit<Board, "id"> {
@@ -17,6 +27,8 @@ export function newBoardFields(input: { title: string; roomCode: string }): Omit
     createdAt: Date.now(),
     endedAt: null,
     googlePhotosConnected: false,
+    googlePhotosArchivedAt: null,
+    googlePhotosShareUrl: null,
   };
 }
 
@@ -30,5 +42,7 @@ export function normaliseBoard(id: string, data: Partial<Board>): Board {
     createdAt: data.createdAt ?? Date.now(),
     endedAt: data.endedAt ?? null,
     googlePhotosConnected: data.googlePhotosConnected ?? false,
+    googlePhotosArchivedAt: data.googlePhotosArchivedAt ?? null,
+    googlePhotosShareUrl: data.googlePhotosShareUrl ?? null,
   };
 }

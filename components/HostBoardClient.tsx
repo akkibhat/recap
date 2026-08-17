@@ -6,7 +6,7 @@ import { useBoardById } from "@/lib/hooks/useBoard";
 import { usePhotos } from "@/lib/hooks/usePhotos";
 import { getHostKey } from "@/lib/hostIdentity";
 import { getOrCreateGuestId, getGuestName, setGuestName } from "@/lib/guestIdentity";
-import { postJson } from "@/lib/api";
+import { postJson, getJson } from "@/lib/api";
 import { PhotoGallery } from "@/components/PhotoGallery";
 import { PhotoUploadForm } from "@/components/PhotoUploadForm";
 import { LogoMark, Wordmark } from "@/components/Logo";
@@ -17,6 +17,8 @@ import {
   buttonDangerClass,
   labelClass,
 } from "@/components/ui";
+
+type EndResult = { archiveError: string | null; archivedCount: number; albumUrl: string | null };
 
 export function HostBoardClient({ boardId }: { boardId: string }) {
   const { data: board, loading } = useBoardById(boardId);
@@ -35,7 +37,10 @@ export function HostBoardClient({ boardId }: { boardId: string }) {
   );
   const [nameDraft, setNameDraft] = useState("");
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
+  const [confirmingEnd, setConfirmingEnd] = useState(false);
+  const [archiveOnEnd, setArchiveOnEnd] = useState(false);
   const [ending, setEnding] = useState(false);
+  const [endResult, setEndResult] = useState<EndResult | null>(null);
   const [connecting, setConnecting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -54,12 +59,27 @@ export function HostBoardClient({ boardId }: { boardId: string }) {
     }).then(setQrDataUrl);
   }, [board]);
 
+  // Opening the dialog pre-ticks the archive box when an album is connected -
+  // that's what connecting was for - but the host still has to pass through
+  // the dialog, so it's never a silent default.
+  function openEndDialog() {
+    setArchiveOnEnd(board?.googlePhotosConnected ?? false);
+    setError(null);
+    setConfirmingEnd(true);
+  }
+
   async function handleEnd() {
-    if (!hostKey || !confirm("End this board? Guests won't be able to add more photos.")) return;
+    if (!hostKey) return;
     setEnding(true);
     setError(null);
     try {
-      await postJson(`/api/boards/${boardId}/end`, {}, hostKey);
+      const result = await postJson<EndResult>(
+        `/api/boards/${boardId}/end`,
+        { archiveToGooglePhotos: archiveOnEnd },
+        hostKey
+      );
+      setEndResult(result);
+      setConfirmingEnd(false);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not end the board.");
     } finally {
@@ -106,6 +126,11 @@ export function HostBoardClient({ boardId }: { boardId: string }) {
     );
   }
 
+  // Once archived, the Storage copies are gone and every downloadUrl on those
+  // photo docs 404s - so the grid would render a wall of broken frames. The
+  // album panel stands in for it.
+  const photosLiveInStorage = !board.googlePhotosArchivedAt;
+
   return (
     <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-6 px-4 py-6">
       <div className="flex items-center justify-between border-b border-line pb-4">
@@ -114,7 +139,7 @@ export function HostBoardClient({ boardId }: { boardId: string }) {
       </div>
 
       {board.endedAt ? (
-        <p className="py-8 text-center text-sm text-bone-dim">This board has ended.</p>
+        <EndedPanel boardId={boardId} hostKey={hostKey} board={board} endResult={endResult} />
       ) : (
         <div className="flex flex-col items-center gap-4 border border-line bg-surface p-6">
           {qrDataUrl && (
@@ -131,7 +156,7 @@ export function HostBoardClient({ boardId }: { boardId: string }) {
 
           {board.googlePhotosConnected ? (
             <p className="text-xs text-bone-dim">
-              Google Photos connected — photos archive there when you end the board.
+              Google Photos connected — you can archive there when you end the board.
             </p>
           ) : (
             <button
@@ -150,12 +175,24 @@ export function HostBoardClient({ boardId }: { boardId: string }) {
             >
               Download all as zip
             </a>
-            <button onClick={handleEnd} disabled={ending} className={buttonDangerClass}>
-              {ending ? "Ending…" : "End board"}
+            <button onClick={openEndDialog} disabled={ending} className={buttonDangerClass}>
+              End board
             </button>
           </div>
           {error && <p className="text-sm text-safelight">{error}</p>}
         </div>
+      )}
+
+      {confirmingEnd && (
+        <EndBoardDialog
+          googlePhotosConnected={board.googlePhotosConnected}
+          archiveOnEnd={archiveOnEnd}
+          onToggleArchive={setArchiveOnEnd}
+          ending={ending}
+          error={error}
+          onCancel={() => setConfirmingEnd(false)}
+          onConfirm={handleEnd}
+        />
       )}
 
       {!board.endedAt &&
@@ -184,7 +221,220 @@ export function HostBoardClient({ boardId }: { boardId: string }) {
           </form>
         ))}
 
-      <PhotoGallery photos={photos} guestId={guestId} />
+      {photosLiveInStorage && <PhotoGallery photos={photos} guestId={guestId} />}
+    </div>
+  );
+}
+
+// Replaces the old window.confirm(). A native confirm can't carry the archive
+// opt-in, and archiving is the one irreversible thing this app does - it
+// deserves a deliberate tick rather than being implied by having connected.
+function EndBoardDialog({
+  googlePhotosConnected,
+  archiveOnEnd,
+  onToggleArchive,
+  ending,
+  error,
+  onCancel,
+  onConfirm,
+}: {
+  googlePhotosConnected: boolean;
+  archiveOnEnd: boolean;
+  onToggleArchive: (value: boolean) => void;
+  ending: boolean;
+  error: string | null;
+  onCancel: () => void;
+  onConfirm: () => void;
+}) {
+  // Escape closes, matching what a native confirm would do.
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape" && !ending) onCancel();
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [ending, onCancel]);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/80 px-4">
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="end-board-title"
+        className="w-full max-w-sm border border-line bg-surface p-6"
+      >
+        <h2 id="end-board-title" className="text-lg font-medium tracking-tight">
+          End this board?
+        </h2>
+        <p className="mt-2 text-sm text-bone-dim">Guests won&apos;t be able to add more photos.</p>
+
+        {googlePhotosConnected && (
+          <label className="mt-5 flex cursor-pointer gap-3 border border-line p-3">
+            <input
+              type="checkbox"
+              checked={archiveOnEnd}
+              onChange={(e) => onToggleArchive(e.target.checked)}
+              disabled={ending}
+              className="mt-0.5 h-4 w-4 shrink-0 accent-safelight"
+            />
+            <span className="text-sm">
+              Also archive to Google Photos
+              <span className="mt-1 block text-xs text-bone-faint">
+                Uploads every photo to the album, then removes the copies from Recap. Leave this
+                off while testing.
+              </span>
+            </span>
+          </label>
+        )}
+
+        {error && <p className="mt-4 text-sm text-safelight">{error}</p>}
+
+        <div className="mt-6 flex flex-col gap-2 sm:flex-row sm:justify-end">
+          <button onClick={onCancel} disabled={ending} className={buttonSecondaryClass}>
+            Cancel
+          </button>
+          <button onClick={onConfirm} disabled={ending} className={buttonDangerClass}>
+            {ending ? "Ending…" : "End board"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Everything the host sees after the board is over: what the archive did, the
+// album link, and the paste-back field that gives guests a link they can open.
+function EndedPanel({
+  boardId,
+  hostKey,
+  board,
+  endResult,
+}: {
+  boardId: string;
+  hostKey: string;
+  board: { googlePhotosConnected: boolean; googlePhotosArchivedAt: number | null; googlePhotosShareUrl: string | null };
+  endResult: EndResult | null;
+}) {
+  // The album URL lives in boardSecrets, which no client can read, so it has
+  // to come back over the host-authenticated API. endResult already carries it
+  // immediately after ending; this fetch covers a later page load.
+  const [albumUrl, setAlbumUrl] = useState<string | null>(endResult?.albumUrl ?? null);
+  const [shareDraft, setShareDraft] = useState("");
+  const [savingShare, setSavingShare] = useState(false);
+  const [shareError, setShareError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (albumUrl || !board.googlePhotosConnected) return;
+    getJson<{ albumUrl: string | null }>(`/api/boards/${boardId}/google-photos`, hostKey)
+      .then((data) => setAlbumUrl(data.albumUrl))
+      .catch(() => setAlbumUrl(null));
+  }, [albumUrl, board.googlePhotosConnected, boardId, hostKey]);
+
+  async function saveShareUrl(value: string) {
+    setSavingShare(true);
+    setShareError(null);
+    try {
+      await postJson(`/api/boards/${boardId}/google-photos`, { shareUrl: value }, hostKey);
+      setShareDraft("");
+    } catch (err) {
+      setShareError(err instanceof Error ? err.message : "Could not save that link.");
+    } finally {
+      setSavingShare(false);
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-5 border border-line bg-surface p-6">
+      <div>
+        <p className={labelClass}>Board ended</p>
+        <p className="mt-1 text-sm text-bone-dim">
+          {board.googlePhotosArchivedAt
+            ? `Photos archived to Google Photos${
+                endResult ? ` — ${endResult.archivedCount} in total` : ""
+              }, and removed from Recap.`
+            : "Photos are still stored in Recap. Nothing was archived."}
+        </p>
+        {endResult?.archiveError && (
+          <p className="mt-2 text-sm text-safelight">
+            Archiving failed: {endResult.archiveError} — your photos are untouched.
+          </p>
+        )}
+      </div>
+
+      {albumUrl && (
+        <div className="border-t border-line pt-5">
+          <p className={labelClass}>Your album</p>
+          <a
+            href={albumUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="mt-2 block truncate text-sm text-safelight underline underline-offset-4"
+          >
+            {albumUrl}
+          </a>
+          <p className="mt-2 text-xs text-bone-faint">
+            This one opens for you only — Google no longer lets apps share an album on your
+            behalf.
+          </p>
+        </div>
+      )}
+
+      {board.googlePhotosConnected && (
+        <div className="border-t border-line pt-5">
+          <p className={labelClass}>Guest link</p>
+          {board.googlePhotosShareUrl ? (
+            <>
+              <a
+                href={board.googlePhotosShareUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="mt-2 block truncate text-sm text-safelight underline underline-offset-4"
+              >
+                {board.googlePhotosShareUrl}
+              </a>
+              <p className="mt-2 text-xs text-bone-faint">
+                Guests see this when they open the board.
+              </p>
+              <button
+                onClick={() => saveShareUrl("")}
+                disabled={savingShare}
+                className="mt-3 text-xs text-bone-dim underline underline-offset-4 hover:text-bone disabled:opacity-30"
+              >
+                Remove it
+              </button>
+            </>
+          ) : (
+            <>
+              <p className="mt-2 text-xs text-bone-faint">
+                In Google Photos, open the album and tap Share → Create link, then paste it here so
+                guests can see the night.
+              </p>
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  if (shareDraft.trim()) saveShareUrl(shareDraft.trim());
+                }}
+                className="mt-3 flex flex-col gap-2 sm:flex-row"
+              >
+                <input
+                  value={shareDraft}
+                  onChange={(e) => setShareDraft(e.target.value)}
+                  placeholder="https://photos.app.goo.gl/…"
+                  className={inputClass}
+                />
+                <button
+                  type="submit"
+                  disabled={!shareDraft.trim() || savingShare}
+                  className={buttonPrimaryClass}
+                >
+                  {savingShare ? "Saving…" : "Save"}
+                </button>
+              </form>
+            </>
+          )}
+          {shareError && <p className="mt-2 text-sm text-safelight">{shareError}</p>}
+        </div>
+      )}
     </div>
   );
 }

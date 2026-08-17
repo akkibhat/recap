@@ -33,7 +33,31 @@ export function JoinBoardClient({ roomCode }: { roomCode: string }) {
   }
 
   if (board.endedAt) {
-    return <CentredMessage title={board.title} detail="This board has ended." />;
+    // If the host archived to Google Photos and pasted back a share link, this
+    // is where the night actually pays off - guests land here later and get
+    // straight to the album rather than a dead end.
+    return (
+      <CentredMessage
+        title={board.title}
+        detail={
+          board.googlePhotosShareUrl
+            ? "This board has ended — the photos are up."
+            : "This board has ended."
+        }
+        action={
+          board.googlePhotosShareUrl ? (
+            <a
+              href={board.googlePhotosShareUrl}
+              target="_blank"
+              rel="noreferrer"
+              className={buttonPrimaryClass}
+            >
+              See the album
+            </a>
+          ) : undefined
+        }
+      />
+    );
   }
 
   if (!guestName) {
@@ -52,7 +76,15 @@ export function JoinBoardClient({ roomCode }: { roomCode: string }) {
   );
 }
 
-function CentredMessage({ title, detail }: { title: string; detail?: string }) {
+function CentredMessage({
+  title,
+  detail,
+  action,
+}: {
+  title: string;
+  detail?: string;
+  action?: React.ReactNode;
+}) {
   return (
     <div className="flex flex-1 flex-col items-center justify-center gap-3 px-6 text-center">
       <span className="text-bone-faint">
@@ -60,6 +92,7 @@ function CentredMessage({ title, detail }: { title: string; detail?: string }) {
       </span>
       <p className="text-lg font-medium">{title}</p>
       {detail && <p className="text-sm text-bone-dim">{detail}</p>}
+      {action && <div className="mt-2">{action}</div>}
     </div>
   );
 }
