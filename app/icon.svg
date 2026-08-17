@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256">
+  <!--
+    Favicon variant of the mark in components/Logo.tsx. Same geometry, but the
+    frame window is filled safelight instead of punched through.
+
+    In the app the logo is monochrome, because red there already means
+    "interactive or important" and a red logo would dilute it. A browser tab
+    strip has no such competition, and a mark with one spot of colour is far
+    easier to pick out of twenty tabs than a white-on-dark silhouette.
+
+    Colours are literal rather than currentColor: a favicon renders outside the
+    page, so it inherits nothing.
+  -->
+  <path fill="#ededed" fill-rule="evenodd" d="M40 64h82v164H40V64Zm12 12v24h24V76H52Zm0 40v24h24v-24H52Zm0 40v24h24v-24H52Z"/>
+  <path fill="#d8342f" d="M86 98h30v96H86z"/>
+  <path fill="#ededed" d="M150 38h40v18h-40z"/>
+  <path fill="#ededed" d="M108 52h132v26H108zM108 214h132v26H108z"/>
+  <path fill="#ededed" fill-rule="evenodd" d="M116 78h116v136H116V78Zm24 118v11h68v-11h-68Z"/>
+</svg>
