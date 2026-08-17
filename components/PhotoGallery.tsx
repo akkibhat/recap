@@ -11,10 +11,9 @@ const EMOJI_GLYPH: Record<ReactionEmoji, string> = {
   wow: "😮",
 };
 
-// Tailwind's `sm` and `lg`, so the gallery steps at the same widths as the
-// rest of the app's layout.
+// Tailwind's `sm`, so the gallery steps at the same width as the rest of the
+// app's layout.
 const TWO_COLUMN_QUERY = "(min-width: 40rem)";
-const THREE_COLUMN_QUERY = "(min-width: 64rem)";
 
 type Frame = { photo: Photo; number: string };
 
@@ -26,13 +25,18 @@ function frameNumber(index: number): string {
   return `${String(index + 1).padStart(2, "0")}A`;
 }
 
-// One strip on a phone, two on a tablet, three on a desktop.
+// One strip on a phone, two once there's room, and deliberately never three.
 //
-// A phone gets a single strip on purpose. Splitting a ~343px content width in
-// two leaves each 3:2 frame about 136px across and 91px tall, which is too
-// small to make out a face - and there is no lightbox to fall back on. One
-// strip gives roughly 313px-wide frames instead, which is the point of looking
-// at photos at all.
+// A phone gets a single strip because splitting a ~343px content width in two
+// leaves each 3:2 frame about 136px across and 91px tall - too small to make
+// out a face, with no lightbox to fall back on. One strip gives roughly
+// 313px-wide frames instead, which is the point of looking at photos at all.
+//
+// It stops at two for the same reason at the other end. The page is capped at
+// max-w-2xl, so the gallery never exceeds ~640px however large the screen is;
+// a third strip divides that into 175px frames, smaller than a phone shows.
+// That would leave the biggest screens displaying the smallest photos. Adding
+// a third strip only makes sense alongside widening the page container.
 //
 // Starts at 1 on both server and client and only widens after mount: reading
 // matchMedia during the first render would make the two disagree and break
@@ -41,23 +45,20 @@ function useColumnCount(): number {
   const [columns, setColumns] = useState(1);
 
   useEffect(() => {
-    const two = window.matchMedia(TWO_COLUMN_QUERY);
-    const three = window.matchMedia(THREE_COLUMN_QUERY);
-    const sync = () => setColumns(three.matches ? 3 : two.matches ? 2 : 1);
+    const query = window.matchMedia(TWO_COLUMN_QUERY);
+    const sync = () => setColumns(query.matches ? 2 : 1);
     sync();
 
-    // Listening to plain resize as well as each query's own change event. The
+    // Listening to plain resize as well as the query's own change event. The
     // change event is the right API and fires on a real phone rotating, but it
     // is not dispatched under devtools viewport emulation, which makes the
     // responsive behaviour impossible to test. Re-running sync costs nothing
     // when the answer hasn't changed - React bails out of the re-render when
     // the state is identical.
-    two.addEventListener("change", sync);
-    three.addEventListener("change", sync);
+    query.addEventListener("change", sync);
     window.addEventListener("resize", sync);
     return () => {
-      two.removeEventListener("change", sync);
-      three.removeEventListener("change", sync);
+      query.removeEventListener("change", sync);
       window.removeEventListener("resize", sync);
     };
   }, []);
