@@ -6,6 +6,7 @@ import type { RollPhoto } from "@/lib/hooks/usePhotos";
 import { setReaction } from "@/lib/setReaction";
 import { deleteOwnPhoto, restoreOwnPhoto } from "@/lib/deletePhoto";
 import { deleteJson, postJson } from "@/lib/api";
+import { PhotoLightbox } from "@/components/PhotoLightbox";
 
 const EMOJI_GLYPH: Record<ReactionEmoji, string> = {
   heart: "❤️",
@@ -89,6 +90,9 @@ export function PhotoGallery({
   // The removed photo itself, not just its id: once it leaves the live query
   // there is nothing left to look its details up from.
   const [removed, setRemoved] = useState<{ photo: RollPhoto; wasMine: boolean } | null>(null);
+  // Index into the displayed frame order, not a photo id: the lightbox needs
+  // to step to the neighbouring frame, which an id alone can't express.
+  const [openIndex, setOpenIndex] = useState<number | null>(null);
 
   if (photos.length === 0 && !removed) {
     return (
@@ -124,9 +128,36 @@ export function PhotoGallery({
             boardId={boardId}
             hostKey={hostKey}
             onRemoved={(photo, wasMine) => setRemoved({ photo, wasMine })}
+            onOpen={(photo) => setOpenIndex(frames.findIndex((f) => f.id === photo.id))}
           />
         ))}
       </div>
+
+      {openIndex !== null && frames[openIndex] && (
+        <PhotoLightbox
+          frames={frames}
+          index={openIndex}
+          guestId={guestId}
+          onNavigate={setOpenIndex}
+          onClose={() => setOpenIndex(null)}
+          canRemove={(photo) => photo.contributorGuestId === guestId || Boolean(hostKey)}
+          onRemove={async (photo) => {
+            // Closing first: the frame is about to leave the live query, and a
+            // lightbox pointing at a photo that no longer exists would land on
+            // whatever slid into that index.
+            setOpenIndex(null);
+            const wasMine = photo.contributorGuestId === guestId;
+            try {
+              if (wasMine) await deleteOwnPhoto(photo.id, guestId);
+              else await deleteJson(`/api/boards/${boardId}/photos/${photo.id}`, hostKey ?? undefined);
+              setRemoved({ photo, wasMine });
+            } catch {
+              // Nothing to roll back - the photo is still there and the strip
+              // still shows it.
+            }
+          }}
+        />
+      )}
     </div>
   );
 }
@@ -197,12 +228,14 @@ function FilmStrip({
   boardId,
   hostKey,
   onRemoved,
+  onOpen,
 }: {
   frames: RollPhoto[];
   guestId: string;
   boardId: string;
   hostKey?: string | null;
   onRemoved: (photo: RollPhoto, wasMine: boolean) => void;
+  onOpen: (photo: RollPhoto) => void;
 }) {
   return (
     <div className="flex min-w-0 flex-1 bg-frame">
@@ -216,6 +249,7 @@ function FilmStrip({
             boardId={boardId}
             hostKey={hostKey}
             onRemoved={onRemoved}
+            onOpen={onOpen}
           />
         ))}
       </div>
@@ -230,12 +264,14 @@ function PhotoFrame({
   boardId,
   hostKey,
   onRemoved,
+  onOpen,
 }: {
   photo: RollPhoto;
   guestId: string;
   boardId: string;
   hostKey?: string | null;
   onRemoved: (photo: RollPhoto, wasMine: boolean) => void;
+  onOpen: (photo: RollPhoto) => void;
 }) {
   const counts = reactionCounts(photo);
   const myReaction = photo.reactedBy[guestId];
@@ -272,12 +308,21 @@ function PhotoFrame({
             A portrait shot survives this crop untouched where a landscape one
             keeps 44% - and at a party, phones are held upright. No single
             ratio is kind to both orientations, so this picks the common case. */}
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src={photo.downloadUrl}
-          alt={photo.caption || "Party photo"}
-          className="aspect-2/3 w-full object-cover"
-        />
+        {/* The frame is the trigger. A button rather than a click handler on
+            the image so it's reachable by keyboard and announced properly. */}
+        <button
+          onClick={() => onOpen(photo)}
+          aria-label={`Open frame ${photo.frameNumber} by ${photo.contributorName}`}
+          className="block w-full"
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={photo.downloadUrl}
+            alt={photo.caption || "Party photo"}
+            loading="lazy"
+            className="aspect-2/3 w-full object-cover"
+          />
+        </button>
 
         {/* Sits on the photo rather than in the reactions row. A destructive
             control among four emoji is easy to hit with a thumb aiming for a
