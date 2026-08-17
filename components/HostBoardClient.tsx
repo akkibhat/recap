@@ -8,6 +8,8 @@ import { usePhotos } from "@/lib/hooks/usePhotos";
 import { getHostKey, saveHostKey } from "@/lib/hostIdentity";
 import { useAuth } from "@/lib/hooks/useAuth";
 import { useUserAccount } from "@/lib/hooks/useUserAccount";
+import { useDeletedPhotos } from "@/lib/hooks/useDeletedPhotos";
+import { galleryUrl, Photo } from "@/lib/types/photo";
 import { getOrCreateGuestId, getGuestName, setGuestName } from "@/lib/guestIdentity";
 import { postJson, getJson } from "@/lib/api";
 import { PhotoGallery } from "@/components/PhotoGallery";
@@ -21,7 +23,16 @@ import {
   labelClass,
 } from "@/components/ui";
 
-type EndResult = { archiveError: string | null; archivedCount: number; albumUrl: string | null };
+type DeletedDecision = "restore" | "keep" | "purge";
+
+type EndResult = {
+  archiveError: string | null;
+  archivedCount: number;
+  skippedCount: number;
+  albumUrl: string | null;
+  reviewError: string | null;
+  review: { restored: number; kept: number; purged: number; deletedAlbumUrl: string | null };
+};
 
 export function HostBoardClient({ boardId }: { boardId: string }) {
   const { data: board, loading } = useBoardById(boardId);
@@ -31,6 +42,8 @@ export function HostBoardClient({ boardId }: { boardId: string }) {
   // rather than mirrored into state via an effect.
   const { user, loading: authLoading } = useAuth();
   const { data: account } = useUserAccount(user?.uid ?? null);
+  const { data: deletedPhotos } = useDeletedPhotos(boardId);
+  const [decisions, setDecisions] = useState<Record<string, DeletedDecision>>({});
   const [hostKey, setHostKey] = useState<string | null>(() =>
     typeof window !== "undefined" ? getHostKey(boardId) : null
   );
@@ -113,7 +126,7 @@ export function HostBoardClient({ boardId }: { boardId: string }) {
     try {
       const result = await postJson<EndResult>(
         `/api/boards/${boardId}/end`,
-        { archiveToGooglePhotos: archiveOnEnd },
+        { archiveToGooglePhotos: archiveOnEnd, deletedDecisions: decisions },
         hostKey
       );
       setEndResult(result);
@@ -317,6 +330,11 @@ export function HostBoardClient({ boardId }: { boardId: string }) {
 
       {confirmingEnd && (
         <EndBoardDialog
+          deletedPhotos={deletedPhotos}
+          decisions={decisions}
+          onDecide={(photoId, decision) =>
+            setDecisions((current) => ({ ...current, [photoId]: decision }))
+          }
           googlePhotosConnected={account?.googlePhotosConnected ?? false}
           archiveOnEnd={archiveOnEnd}
           onToggleArchive={setArchiveOnEnd}
@@ -364,6 +382,9 @@ export function HostBoardClient({ boardId }: { boardId: string }) {
 // opt-in, and archiving is the one irreversible thing this app does - it
 // deserves a deliberate tick rather than being implied by having connected.
 function EndBoardDialog({
+  deletedPhotos,
+  decisions,
+  onDecide,
   googlePhotosConnected,
   archiveOnEnd,
   onToggleArchive,
@@ -372,6 +393,9 @@ function EndBoardDialog({
   onCancel,
   onConfirm,
 }: {
+  deletedPhotos: Photo[];
+  decisions: Record<string, DeletedDecision>;
+  onDecide: (photoId: string, decision: DeletedDecision) => void;
   googlePhotosConnected: boolean;
   archiveOnEnd: boolean;
   onToggleArchive: (value: boolean) => void;
@@ -419,6 +443,15 @@ function EndBoardDialog({
               </span>
             </span>
           </label>
+        )}
+
+        {deletedPhotos.length > 0 && (
+          <DeletedReview
+            photos={deletedPhotos}
+            decisions={decisions}
+            onDecide={onDecide}
+            googlePhotosConnected={googlePhotosConnected}
+          />
         )}
 
         {error && <p className="mt-4 text-sm text-safelight">{error}</p>}
@@ -571,6 +604,84 @@ function EndedPanel({
           {shareError && <p className="mt-2 text-sm text-safelight">{shareError}</p>}
         </div>
       )}
+    </div>
+  );
+}
+
+// What happens to frames taken off the roll during the night.
+//
+// Keep is the default for anything untouched, and purging always needs a
+// deliberate tap. The reverse - destroy unless told otherwise - was considered
+// and rejected: it inverts the point of soft delete, and this screen appears
+// exactly when a tired host is tapping through to be done. Wrongly keeping a
+// photo costs a few megabytes; wrongly destroying one is permanent.
+function DeletedReview({
+  photos,
+  decisions,
+  onDecide,
+  googlePhotosConnected,
+}: {
+  photos: Photo[];
+  decisions: Record<string, DeletedDecision>;
+  onDecide: (photoId: string, decision: DeletedDecision) => void;
+  googlePhotosConnected: boolean;
+}) {
+  const options: { value: DeletedDecision; label: string }[] = [
+    { value: "keep", label: "Keep" },
+    { value: "restore", label: "Put back" },
+    { value: "purge", label: "Delete" },
+  ];
+
+  return (
+    <div className="mt-5 border-t border-line pt-4">
+      <p className={labelClass}>
+        {photos.length} frame{photos.length === 1 ? "" : "s"} taken off the roll
+      </p>
+      <p className="mt-1 text-xs text-bone-faint">
+        {googlePhotosConnected
+          ? "Kept frames go to your Recap - Deleted Photos album. Nothing is deleted unless you say so."
+          : "Kept frames stay in Recap. Nothing is deleted unless you say so."}
+      </p>
+
+      <ul className="mt-3 flex flex-col gap-2">
+        {photos.map((photo) => {
+          const chosen = decisions[photo.id] ?? "keep";
+          return (
+            <li key={photo.id} className="flex items-center gap-3">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={galleryUrl(photo)}
+                alt={photo.caption || "Removed frame"}
+                className="size-12 shrink-0 border border-line object-cover"
+              />
+              <div className="flex min-w-0 flex-1 flex-col gap-1">
+                <span className="truncate text-[11px] text-bone-dim">
+                  {photo.contributorName}
+                  {photo.deletedBy === "host" ? " · you removed it" : " · they removed it"}
+                </span>
+                <div className="flex gap-1">
+                  {options.map((option) => (
+                    <button
+                      key={option.value}
+                      type="button"
+                      onClick={() => onDecide(photo.id, option.value)}
+                      className={`px-2 py-1 text-[11px] ${
+                        chosen === option.value
+                          ? option.value === "purge"
+                            ? "bg-safelight/20 text-safelight"
+                            : "bg-line text-bone"
+                          : "text-bone-faint hover:text-bone"
+                      }`}
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </li>
+          );
+        })}
+      </ul>
     </div>
   );
 }

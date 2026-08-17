@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebase/admin";
 import { requireHostKey } from "@/lib/hostAuth";
 import { archiveBoardToGooglePhotos } from "@/lib/archiveToGooglePhotos";
+import { applyDeletedReview, DeletedDecision, ReviewOutcome } from "@/lib/deletedAlbum";
+import { normalisePhoto, isVisible } from "@/lib/types/photo";
+import { normaliseBoard } from "@/lib/types/board";
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ boardId: string }> }) {
   const { boardId } = await params;
@@ -17,10 +20,16 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ boa
   const body = await req.json().catch(() => ({}));
   const wantsArchive = body?.archiveToGooglePhotos === true;
 
+  // What the host decided about frames taken off the roll during the night.
+  // Anything absent from this map defaults to keeping - see DEFAULT_DECISION.
+  const decisions: Record<string, DeletedDecision> =
+    body?.deletedDecisions && typeof body.deletedDecisions === "object" ? body.deletedDecisions : {};
+
   const boardDoc = await adminDb.collection("boards").doc(boardId).get();
   if (!boardDoc.exists) {
     return NextResponse.json({ error: "Board not found." }, { status: 404 });
   }
+  const board = normaliseBoard(boardDoc.id, boardDoc.data() ?? {});
 
   let archiveError: string | null = null;
   let archivedCount = 0;
@@ -51,10 +60,37 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ boa
     }
   }
 
+  // Deleted frames are settled AFTER archiving, so a photo the host chose to
+  // restore has already had its chance to reach the board's own album rather
+  // than being brought back only to be left out of it.
+  let review: ReviewOutcome = { restored: 0, kept: 0, purged: 0, deletedAlbumUrl: null };
+  let reviewError: string | null = null;
+  try {
+    const photosSnap = await adminDb.collection("boards").doc(boardId).collection("photos").get();
+    const deleted = photosSnap.docs
+      .map((doc) => ({ photo: normalisePhoto(doc.id, doc.data()), ref: doc.ref }))
+      .filter(({ photo }) => !isVisible(photo));
+
+    review = await applyDeletedReview(boardId, board.ownerUid, deleted, decisions);
+  } catch (err) {
+    // Same posture as the archive: never block ending the board. A failure
+    // here leaves deleted photos exactly as they were, which is the safe state.
+    reviewError = err instanceof Error ? err.message : "Reviewing deleted frames failed.";
+    console.error("Deleted review failed:", err);
+  }
+
   await adminDb.collection("boards").doc(boardId).update({
     endedAt: Date.now(),
     googlePhotosArchivedAt: archivedAt,
   });
 
-  return NextResponse.json({ ok: true, archiveError, archivedCount, skippedCount, albumUrl });
+  return NextResponse.json({
+    ok: true,
+    archiveError,
+    archivedCount,
+    skippedCount,
+    albumUrl,
+    reviewError,
+    review,
+  });
 }
