@@ -64,7 +64,7 @@ export function HostSignIn() {
       <button
         onClick={() => run(signInWithGoogle)}
         disabled={busy}
-        title="Optional. Signing in keeps your boards across devices."
+        title="Sign in with Google to start a board. Your boards then follow you to any device."
         className="press text-[17px] text-bone hover:opacity-70 disabled:opacity-30"
       >
         {busy ? "Signing in…" : "Sign in"}
