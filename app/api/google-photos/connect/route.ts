@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { nanoid } from "nanoid";
-import { getAuth } from "firebase-admin/auth";
-import { adminDb, adminApp } from "@/lib/firebase/admin";
+import { adminDb } from "@/lib/firebase/admin";
+import { readIdToken } from "@/lib/idToken";
 import { getGooglePhotosAuthUrl } from "@/lib/googlePhotos";
 
 // How long a pending OAuth handshake stays valid. Long enough to pick an
@@ -13,17 +13,14 @@ const STATE_TTL_MS = 15 * 60 * 1000;
 // a signed-in identity rather than a board's host key. Connect once and every
 // board you run can archive.
 export async function POST(req: NextRequest) {
-  const header = req.headers.get("authorization");
-  if (!header?.startsWith("Bearer ")) {
+  const token = await readIdToken(req);
+  if (token.status === "missing") {
     return NextResponse.json({ error: "Sign in before connecting Google Photos." }, { status: 401 });
   }
-
-  let uid: string;
-  try {
-    uid = (await getAuth(adminApp).verifyIdToken(header.slice(7))).uid;
-  } catch {
+  if (token.status === "invalid") {
     return NextResponse.json({ error: "Your session has expired - sign in again." }, { status: 401 });
   }
+  const uid = token.uid;
 
   // The OAuth `state` is an unguessable nonce recorded server-side, rather than
   // the uid itself. The callback arrives as a plain browser redirect with no

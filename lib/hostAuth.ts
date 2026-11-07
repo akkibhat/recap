@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getAuth } from "firebase-admin/auth";
-import { adminDb, adminApp } from "@/lib/firebase/admin";
+import { adminDb } from "@/lib/firebase/admin";
+import { readIdToken } from "@/lib/idToken";
 import { normaliseBoardSecret } from "@/lib/types/boardSecret";
 import { normaliseBoard } from "@/lib/types/board";
 
@@ -8,18 +8,11 @@ type HostAuthResult =
   | { ok: true; uid: string | null }
   | { ok: false; response: NextResponse };
 
-// Verifies a Firebase ID token from the Authorization header. Returns null for
-// anything unusable rather than throwing, because arriving without a token is
-// the normal case for a host who never signed in.
+// The signed-in uid, or null for a missing or bad token. Arriving without one
+// is normal for a host using only the board's hostKey.
 async function verifiedUid(req: NextRequest): Promise<string | null> {
-  const header = req.headers.get("authorization");
-  if (!header?.startsWith("Bearer ")) return null;
-  try {
-    const decoded = await getAuth(adminApp).verifyIdToken(header.slice(7));
-    return decoded.uid;
-  } catch {
-    return null;
-  }
+  const token = await readIdToken(req);
+  return token.status === "ok" ? token.uid : null;
 }
 
 // Shared by every host-privileged API route. Either of two credentials is

@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getAuth } from "firebase-admin/auth";
-import { adminApp } from "@/lib/firebase/admin";
+import { emailAllowed, parseEmailList, readIdToken } from "@/lib/idToken";
 
 type AdminAuthResult = { ok: true; email: string } | { ok: false; response: NextResponse };
 
@@ -13,15 +12,6 @@ type AdminAuthResult = { ok: true; email: string } | { ok: false; response: Next
 // single-owner personal tool and would not be for anything multi-tenant.
 function allowedEmails(): string[] {
   return parseEmailList(process.env.RECAP_ADMIN_EMAILS ?? "");
-}
-
-// Splits a comma-separated env var into trimmed, lower-case emails, dropping
-// blanks. Shared with the host allow-list in lib/hostAccess.ts.
-export function parseEmailList(raw: string): string[] {
-  return raw
-    .split(",")
-    .map((entry) => entry.trim().toLowerCase())
-    .filter(Boolean);
 }
 
 // Gate for every admin route. Fails closed in every direction that matters:
@@ -38,25 +28,16 @@ export async function requireAdmin(req: NextRequest): Promise<AdminAuthResult> {
     };
   }
 
-  const header = req.headers.get("authorization");
-  if (!header?.startsWith("Bearer ")) {
+  const token = await readIdToken(req);
+  if (token.status === "missing") {
     return { ok: false, response: NextResponse.json({ error: "Sign in first." }, { status: 401 }) };
   }
-
-  let email: string | undefined;
-  let emailVerified = false;
-  try {
-    const decoded = await getAuth(adminApp).verifyIdToken(header.slice(7));
-    email = decoded.email;
-    emailVerified = decoded.email_verified === true;
-  } catch {
+  if (token.status === "invalid") {
     return { ok: false, response: NextResponse.json({ error: "Session expired." }, { status: 401 }) };
   }
 
-  // Requiring email_verified matters: matching on an unverified address would
-  // let anyone who can set an email claim walk in. Google sign-in always
-  // verifies, so this only ever rejects something that shouldn't be here.
-  if (!email || !emailVerified || !allowed.includes(email.toLowerCase())) {
+  const email = token.email;
+  if (!emailAllowed(token, allowed)) {
     return {
       ok: false,
       response: NextResponse.json(
@@ -66,5 +47,5 @@ export async function requireAdmin(req: NextRequest): Promise<AdminAuthResult> {
     };
   }
 
-  return { ok: true, email };
+  return { ok: true, email: email! };
 }

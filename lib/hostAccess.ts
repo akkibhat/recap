@@ -1,7 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getAuth } from "firebase-admin/auth";
-import { adminApp } from "@/lib/firebase/admin";
-import { parseEmailList } from "@/lib/adminAuth";
+import { emailAllowed, parseEmailList, readIdToken } from "@/lib/idToken";
 
 type HostAccessResult = { ok: true; uid: string; email: string } | { ok: false; response: NextResponse };
 
@@ -28,32 +26,22 @@ export async function requireHostAccount(req: NextRequest): Promise<HostAccessRe
     };
   }
 
-  const header = req.headers.get("authorization");
-  if (!header?.startsWith("Bearer ")) {
+  const token = await readIdToken(req);
+  if (token.status === "missing") {
     return {
       ok: false,
       response: NextResponse.json({ error: "Sign in to start a board." }, { status: 401 }),
     };
   }
-
-  let uid: string;
-  let email: string | undefined;
-  let emailVerified = false;
-  try {
-    const decoded = await getAuth(adminApp).verifyIdToken(header.slice(7));
-    uid = decoded.uid;
-    email = decoded.email;
-    emailVerified = decoded.email_verified === true;
-  } catch {
+  if (token.status === "invalid") {
     return {
       ok: false,
       response: NextResponse.json({ error: "Your sign-in expired. Sign in again." }, { status: 401 }),
     };
   }
 
-  // email_verified matters for the same reason as in adminAuth: an unverified
-  // address claim could be anything. Google sign-in always verifies.
-  if (!email || !emailVerified || !allowed.includes(email.toLowerCase())) {
+  const email = token.email;
+  if (!emailAllowed(token, allowed)) {
     return {
       ok: false,
       response: NextResponse.json(
@@ -63,5 +51,5 @@ export async function requireHostAccount(req: NextRequest): Promise<HostAccessRe
     };
   }
 
-  return { ok: true, uid, email };
+  return { ok: true, uid: token.uid, email: email! };
 }

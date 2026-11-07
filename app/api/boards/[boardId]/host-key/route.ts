@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getAuth } from "firebase-admin/auth";
-import { adminDb, adminApp } from "@/lib/firebase/admin";
+import { adminDb } from "@/lib/firebase/admin";
+import { readIdToken } from "@/lib/idToken";
 import { normaliseBoardSecret } from "@/lib/types/boardSecret";
 import { normaliseBoard } from "@/lib/types/board";
 
@@ -14,17 +14,14 @@ import { normaliseBoard } from "@/lib/types/board";
 export async function GET(req: NextRequest, { params }: { params: Promise<{ boardId: string }> }) {
   const { boardId } = await params;
 
-  const header = req.headers.get("authorization");
-  if (!header?.startsWith("Bearer ")) {
+  const token = await readIdToken(req);
+  if (token.status === "missing") {
     return NextResponse.json({ error: "Sign in to recover this board." }, { status: 401 });
   }
-
-  let uid: string;
-  try {
-    uid = (await getAuth(adminApp).verifyIdToken(header.slice(7))).uid;
-  } catch {
+  if (token.status === "invalid") {
     return NextResponse.json({ error: "Your session has expired - sign in again." }, { status: 401 });
   }
+  const uid = token.uid;
 
   const boardDoc = await adminDb.collection("boards").doc(boardId).get();
   if (!boardDoc.exists) {
