@@ -1,0 +1,14 @@
+# Line endings are LF everywhere - in the repo and in the working tree.
+# Without this, core.autocrlf=true rewrites checkouts to CRLF on Windows and
+# warns on every add. Declaring it here makes the result identical regardless
+# of each machine's git config.
+* text=auto eol=lf
+
+# Binary: never touch these.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.ico binary
+*.mp4 binary
+*.woff binary
+*.woff2 binary
