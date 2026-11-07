@@ -1,40 +1,55 @@
 @import "tailwindcss";
 
 /*
-  "Darkroom" theme. The app is a wall of guest photos, so the chrome stays
-  near-black and almost colourless - every bit of colour on screen should be
-  coming from the photos themselves. One accent (safelight red) carries the
-  brand.
+  Recap theme: true black, flat, one hot pink.
 
-  Note: `danger` is deliberately NOT red here. Red is the brand colour, so a
-  red "end board" button would read as decoration rather than warning. The
-  destructive action uses a bone/outline treatment plus a confirm instead.
+  The app is a wall of guest photos, so the chrome stays black and colourless
+  and every bit of colour on screen comes from the photos. Surfaces are told
+  apart by lightness alone (black ground, #111 card, #2a2a2a nested), never by
+  borders or shadows. Pink is the brand: the home page's action, "live", the
+  room code and an active reaction. The app's primary action is an inverted
+  white pill rather than pink, so pink stays rare enough to mean something.
+
+  The old token names (ink, surface, bone, safelight...) are kept so every
+  component picks up the new look without a rename across the codebase.
+
+  Note: `danger` is deliberately NOT pink/red. A coloured "end board" button
+  would read as decoration; the destructive action stays neutral, with a
+  confirm behind it.
 */
 @theme {
-  --color-ink: #0a0a0a;
+  /* Grounds: the app is true black; the home page is a plum-black that only
+     the home page uses. */
+  --color-ink: #000000;
+  --color-plum: #0d060b;
+  --color-plum-raised: #1b0e17;
+
+  /* Lightness steps for surfaces. */
   --color-surface: #111111;
-  --color-surface-raised: #1a1a1a;
+  --color-surface-raised: #2a2a2a;
+
+  /* Kept for real form fields and tables only (allowed to carry a line). */
   --color-line: #2a2a2a;
   --color-line-bright: #3d3d3d;
 
-  --color-safelight: #d8342f;
-  --color-safelight-dim: #8f2320;
+  /* The brand accent. "safelight" kept as the name so existing uses follow. */
+  --color-safelight: #ff488b;
+  --color-safelight-dim: #d93a75;
 
-  /* The film base itself - lifted just far enough off `ink` that a strip
-     reads as a physical object lying on the page, never as a bright panel
-     competing with the photo it carries. */
-  --color-frame: #141414;
-  --color-frame-line: #262626;
-  /* Edge printing: the amber lettering exposed along the rebate of a
-     developed negative. The only warm colour in the app, and it stays
-     confined to frame numbers and contributor names. */
-  --color-edge: #c8802a;
+  /* Retired film tokens, mapped onto the new surfaces so nothing breaks. */
+  --color-frame: #111111;
+  --color-frame-line: #111111;
+  --color-edge: #bbbbbb;
 
-  --color-bone: #ededed;
-  --color-bone-dim: #8c8c8c;
-  --color-bone-faint: #5c5c5c;
+  /* Text: white, a soft grey for secondary, a muted grey that still passes
+     4.5:1 on black (#8a8a8a is 6:1). */
+  --color-bone: #ffffff;
+  --color-bone-dim: #bbbbbb;
+  --color-bone-faint: #8a8a8a;
 
-  --font-mono: var(--font-plex-mono);
+  --font-sans: "General Sans", ui-sans-serif, system-ui, sans-serif;
+  /* Anything still asking for mono gets the text face: monospace is for code. */
+  --font-mono: "General Sans", ui-sans-serif, system-ui, sans-serif;
 }
 
 html {
@@ -46,7 +61,8 @@ html {
 body {
   background: var(--color-ink);
   color: var(--color-bone);
-  font-family: var(--font-plex-mono), ui-monospace, monospace;
+  font-family: var(--font-sans);
+  font-feature-settings: "tnum" 0;
 }
 
 ::selection {
@@ -54,49 +70,80 @@ body {
   color: var(--color-ink);
 }
 
-/*
-  Punched sprocket edges, for anything that should read as a length of 35mm
-  film. Two variants, because a strip running across the page is perforated
-  along its top and bottom, while one running down the page is perforated
-  along its left and right.
-
-  Both are drawn as a repeating background rather than a row of elements, so
-  they stay independent of the length they have to cover - a strip can be any
-  size and the holes just continue, with no count to keep in sync and no extra
-  DOM in a gallery that may hold hundreds of frames. The stops are hard, so
-  these read as square holes rather than as a gradient.
-
-  The holes are painted in `ink` rather than left transparent: they have to
-  match the page behind the strip, and every surface these sit on is `ink`.
-  If a strip is ever placed on `surface`, this needs a variant.
-*/
-
-/* Horizontal run - used by the film leader on the host screen. */
-.sprocket-edge {
-  height: 10px;
-  flex-shrink: 0;
-  background-image: repeating-linear-gradient(
-    to right,
-    var(--color-ink) 0 7px,
-    transparent 7px 17px
-  );
-  background-position: center;
+/* Figures that line up (counts, times, codes). */
+.tabular {
+  font-variant-numeric: tabular-nums;
 }
 
-/* Vertical run - the gutters either side of a strip in the gallery. The
-   gutter is wider than the hole so the perforations sit inset from the edge
-   of the film, as they do on the real thing. A single tile is sized and
-   repeated down the axis, which keeps each hole exactly 9px regardless of how
-   tall the column grows. */
-.sprocket-column {
-  width: 15px;
-  flex-shrink: 0;
-  background-image: linear-gradient(
-    to bottom,
-    var(--color-ink) 0 9px,
-    transparent 9px 20px
-  );
-  background-size: 7px 20px;
-  background-repeat: repeat-y;
-  background-position: center top;
+/* ---------------------------------------------------------------------
+   The photo-word on the home page: a photograph set inside the headline
+   where a word would be. Cap-height tall, on the baseline, a word space
+   either side, so it reads as part of the sentence and not as a picture
+   placed next to it. Its images cross-fade (see PhotoWord.tsx).
+--------------------------------------------------------------------- */
+.photo-word {
+  display: inline-block;
+  position: relative;
+  height: 0.7em;
+  width: 1.3em;
+  vertical-align: baseline;
+  border-radius: 0.12em;
+  overflow: hidden;
+  margin: 0 0.04em;
+  background: var(--color-plum-raised);
+}
+.photo-word img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0;
+  transition: opacity 700ms ease;
+}
+.photo-word img[data-on="true"] {
+  opacity: 1;
+}
+@media (prefers-reduced-motion: reduce) {
+  .photo-word img {
+    transition: none;
+  }
+}
+
+/* Entrance on the home page: each part rises 24px into place, staggered by
+   inline animation-delay (headline, then text, then actions, then each frame
+   of the strip). `both` keeps a part hidden until its turn and in place after;
+   with reduced motion there's no travel at all. Content never depends on a
+   script to appear. */
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.rise {
+  animation: rise 620ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .rise {
+    animation: none;
+  }
+}
+
+/* Press feedback for every button and link-button: a small dip, no colour
+   change, transform only. */
+.press {
+  transition: transform 120ms ease, background-color 150ms ease, opacity 150ms ease;
+}
+.press:active {
+  transform: scale(0.97);
+}
+@media (prefers-reduced-motion: reduce) {
+  .press:active {
+    transform: none;
+  }
 }

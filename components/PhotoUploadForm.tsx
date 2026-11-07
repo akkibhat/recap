@@ -14,6 +14,10 @@ type PendingPhoto = {
   previewUrl: string;
 };
 
+// The guest's way onto the board: pick photos or videos, give each one an
+// optional caption, then send them up one at a time with an "n of m" counter.
+// Laid out flat on the black page - a #111 tile to choose files, a #111 row per
+// queued photo, and the white pill to send them.
 export function PhotoUploadForm({
   boardId,
   guestId,
@@ -29,6 +33,7 @@ export function PhotoUploadForm({
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Adds whatever the guest just picked to the queue, each with its own preview.
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const picked = Array.from(e.target.files ?? []);
     if (picked.length === 0) return;
@@ -49,10 +54,12 @@ export function PhotoUploadForm({
     if (fileInputRef.current) fileInputRef.current.value = "";
   }
 
+  // Sets the caption on one queued photo.
   function updateCaption(id: string, caption: string) {
     setPending((current) => current.map((p) => (p.id === id ? { ...p, caption } : p)));
   }
 
+  // Drops one photo from the queue and frees its preview.
   function removePending(id: string) {
     setPending((current) => {
       const match = current.find((p) => p.id === id);
@@ -61,11 +68,13 @@ export function PhotoUploadForm({
     });
   }
 
+  // Empties the queue after a successful send, freeing every preview.
   function clearPending(items: PendingPhoto[]) {
     items.forEach((p) => URL.revokeObjectURL(p.previewUrl));
     setPending([]);
   }
 
+  // Uploads the queue in order, keeping anything that didn't make it.
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (pending.length === 0) return;
@@ -108,8 +117,18 @@ export function PhotoUploadForm({
   }
 
   return (
-    <form onSubmit={handleSubmit} className="flex flex-col gap-3 border border-line bg-surface p-4">
-      <label className="flex cursor-pointer items-center justify-center border border-dashed border-line-bright px-4 py-6 text-sm text-bone-dim hover:border-bone hover:text-bone">
+    <form onSubmit={handleSubmit} className="flex flex-col gap-2">
+      {/* Choosing photos is the first thing a guest does, so with nothing
+          queued the chooser IS the primary action (the white pill). Once
+          photos are queued it steps back to a quiet "Add more", and the send
+          button takes over as the primary. */}
+      <label
+        className={
+          pending.length === 0
+            ? `${buttonPrimaryClass} flex cursor-pointer items-center justify-center has-focus-visible:ring-2 has-focus-visible:ring-safelight`
+            : "press flex cursor-pointer items-center justify-center rounded-full bg-surface px-4 py-3 text-[15px] text-bone-dim hover:bg-surface-raised hover:text-bone has-focus-visible:ring-2 has-focus-visible:ring-safelight"
+        }
+      >
         <input
           ref={fileInputRef}
           type="file"
@@ -118,13 +137,13 @@ export function PhotoUploadForm({
           onChange={handleFileChange}
           className="sr-only"
         />
-        {pending.length > 0 ? "Add more" : "Choose photos or video"}
+        {pending.length > 0 ? "Add more" : "Add photos or video"}
       </label>
 
       {pending.length > 0 && (
-        <div className="flex flex-col gap-3">
+        <div className="flex flex-col gap-2">
           {pending.map((item) => (
-            <div key={item.id} className="flex gap-3 border border-line p-2">
+            <div key={item.id} className="flex gap-3 rounded-2xl bg-surface p-2">
               {/* A video can't be previewed with an img tag - it would render
                   as a broken image rather than its first frame. */}
               {item.file.type.startsWith("video/") ? (
@@ -133,14 +152,14 @@ export function PhotoUploadForm({
                   muted
                   playsInline
                   preload="metadata"
-                  className="size-20 shrink-0 border border-line object-cover"
+                  className="size-20 shrink-0 rounded-[10px] object-cover"
                 />
               ) : (
                 /* eslint-disable-next-line @next/next/no-img-element */
                 <img
                   src={item.previewUrl}
                   alt=""
-                  className="size-20 shrink-0 border border-line object-cover"
+                  className="size-20 shrink-0 rounded-[10px] object-cover"
                 />
               )}
               <div className="flex min-w-0 flex-1 flex-col gap-2">
@@ -150,13 +169,13 @@ export function PhotoUploadForm({
                   placeholder="Caption (optional)"
                   maxLength={280}
                   disabled={uploading}
-                  className={`${inputClass} py-2 text-xs`}
+                  className={`${inputClass} bg-surface-raised! py-2.5! text-[15px]!`}
                 />
                 <button
                   type="button"
                   onClick={() => removePending(item.id)}
                   disabled={uploading}
-                  className="self-start text-xs text-bone-faint underline underline-offset-4 hover:text-bone disabled:opacity-30"
+                  className="press self-start rounded-full px-3 py-1.5 text-[15px] text-bone-dim hover:bg-surface-raised hover:text-bone disabled:opacity-30 outline-none focus-visible:ring-2 focus-visible:ring-safelight"
                 >
                   Remove
                 </button>
@@ -166,14 +185,18 @@ export function PhotoUploadForm({
         </div>
       )}
 
-      <button type="submit" disabled={pending.length === 0 || uploading} className={buttonPrimaryClass}>
-        {uploading
-          ? `Developing ${Math.min(uploadedCount + 1, pending.length)} of ${pending.length}…`
-          : pending.length > 1
-            ? `Add ${pending.length} photos`
-            : "Add to the board"}
-      </button>
-      {error && <p className="text-sm text-safelight">{error}</p>}
+      {/* Only shown once there's something to send, so a guest never meets
+          a greyed-out button. */}
+      {pending.length > 0 && (
+        <button type="submit" disabled={uploading} className={`${buttonPrimaryClass} tabular mt-1`}>
+          {uploading
+            ? `Adding ${Math.min(uploadedCount + 1, pending.length)} of ${pending.length}…`
+            : pending.length > 1
+              ? `Add ${pending.length} photos to the board`
+              : "Add to the board"}
+        </button>
+      )}
+      {error && <p className="text-[15px] text-safelight">{error}</p>}
     </form>
   );
 }

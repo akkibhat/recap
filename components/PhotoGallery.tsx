@@ -10,7 +10,6 @@ import {
   ReactionEmoji,
 } from "@/lib/types/photo";
 import type { RollPhoto } from "@/lib/hooks/usePhotos";
-import type { Comment } from "@/lib/types/comment";
 import { setReaction } from "@/lib/setReaction";
 import { deleteOwnPhoto, restoreOwnPhoto } from "@/lib/deletePhoto";
 import { deleteJson, postJson } from "@/lib/api";
@@ -24,64 +23,14 @@ const EMOJI_GLYPH: Record<ReactionEmoji, string> = {
   wow: "😮",
 };
 
-// Tailwind's `sm`, so the gallery steps at the same width as the rest of the
-// app's layout.
-const TWO_COLUMN_QUERY = "(min-width: 40rem)";
-
-
-// One strip on a phone, two once there's room, and deliberately never three.
+// The board's photos as a masonry wall of flat cards, newest first, plus the
+// undo notice and the lightbox they open into.
 //
-// A phone gets a single strip because splitting a ~343px content width in two
-// leaves each frame about 136px across - too small to make out a face, with no
-// lightbox to fall back on. One strip gives 313x470 frames instead, which is
-// the point of looking at photos at all.
-//
-// It stops at two for the same reason at the other end. The page is capped at
-// max-w-2xl, so the gallery never exceeds ~640px however large the screen is;
-// a third strip divides that into 175px-wide frames, narrower than a phone
-// shows. That would leave the biggest screens displaying the smallest photos.
-// Adding a third strip only makes sense alongside widening the page container.
-//
-// Starts at 1 on both server and client and only widens after mount: reading
-// matchMedia during the first render would make the two disagree and break
-// hydration.
-function useColumnCount(): number {
-  const [columns, setColumns] = useState(1);
-
-  useEffect(() => {
-    const query = window.matchMedia(TWO_COLUMN_QUERY);
-    const sync = () => setColumns(query.matches ? 2 : 1);
-    sync();
-
-    // Listening to plain resize as well as the query's own change event. The
-    // change event is the right API and fires on a real phone rotating, but it
-    // is not dispatched under devtools viewport emulation, which makes the
-    // responsive behaviour impossible to test. Re-running sync costs nothing
-    // when the answer hasn't changed - React bails out of the re-render when
-    // the state is identical.
-    query.addEventListener("change", sync);
-    window.addEventListener("resize", sync);
-    return () => {
-      query.removeEventListener("change", sync);
-      window.removeEventListener("resize", sync);
-    };
-  }, []);
-
-  return columns;
-}
-
-// Deals the frames across the strips in rotation rather than filling one strip
-// before starting the next. Every frame is the same height, so rotation keeps
-// the strips level without measuring anything, and it also means reading the
-// top row left to right gives you the most recent photos.
-function dealIntoColumns(frames: RollPhoto[], columnCount: number): RollPhoto[][] {
-  const columns: RollPhoto[][] = Array.from({ length: columnCount }, () => []);
-  frames.forEach((frame, index) => columns[index % columnCount].push(frame));
-  // A board with fewer photos than columns would otherwise render empty strips
-  // of bare sprockets alongside the real one.
-  return columns.filter((column) => column.length > 0);
-}
-
+// The layout is plain CSS columns: two on a phone, three from `sm`, four from
+// `lg`. Each card keeps its photo's own shape, so a landscape shot is no longer
+// cropped to a portrait frame, and the columns balance themselves without any
+// measuring in JavaScript. CSS columns fill top to bottom, so the newest photo
+// sits at the top of the first column.
 export function PhotoGallery({
   photos,
   guestId,
@@ -97,20 +46,19 @@ export function PhotoGallery({
   boardId: string;
   hostKey?: string | null;
 }) {
-  const columnCount = useColumnCount();
   const { byPhoto: commentsByPhoto } = useCommentsByPhoto(boardId);
   // The removed photo itself, not just its id: once it leaves the live query
   // there is nothing left to look its details up from.
   const [removed, setRemoved] = useState<{ photo: RollPhoto; wasMine: boolean } | null>(null);
-  // Index into the displayed frame order, not a photo id: the lightbox needs
-  // to step to the neighbouring frame, which an id alone can't express.
+  // Index into the displayed order, not a photo id: the lightbox needs to step
+  // to the neighbouring photo, which an id alone can't express.
   const [openIndex, setOpenIndex] = useState<number | null>(null);
 
   if (photos.length === 0 && !removed) {
     return (
-      <div className="border border-dashed border-line py-16 text-center">
-        <p className="text-sm text-bone-dim">Nothing developed yet</p>
-        <p className="mt-1 text-xs text-bone-faint">First frame of the night goes here</p>
+      <div className="rounded-2xl bg-surface px-5 py-14 text-center">
+        <p className="text-[17px] text-bone">No photos yet</p>
+        <p className="mt-1 text-[15px] text-bone-dim">The first one of the night goes here.</p>
       </div>
     );
   }
@@ -131,17 +79,17 @@ export function PhotoGallery({
         />
       )}
 
-      <div className="flex gap-3">
-        {dealIntoColumns(frames, columnCount).map((column, index) => (
-          <FilmStrip
-            key={index}
-            frames={column}
+      <div className="columns-2 gap-2 sm:columns-3 lg:columns-4">
+        {frames.map((photo) => (
+          <PhotoCard
+            key={photo.id}
+            photo={photo}
             guestId={guestId}
             boardId={boardId}
             hostKey={hostKey}
-            onRemoved={(photo, wasMine) => setRemoved({ photo, wasMine })}
-            commentsByPhoto={commentsByPhoto}
-            onOpen={(photo) => setOpenIndex(frames.findIndex((f) => f.id === photo.id))}
+            onRemoved={(removedPhoto, wasMine) => setRemoved({ photo: removedPhoto, wasMine })}
+            onOpen={(opened) => setOpenIndex(frames.findIndex((f) => f.id === opened.id))}
+            commentCount={(commentsByPhoto.get(photo.id) ?? []).length}
           />
         ))}
       </div>
@@ -159,7 +107,7 @@ export function PhotoGallery({
           onClose={() => setOpenIndex(null)}
           canRemove={(photo) => photo.contributorGuestId === guestId || Boolean(hostKey)}
           onRemove={async (photo) => {
-            // Closing first: the frame is about to leave the live query, and a
+            // Closing first: the photo is about to leave the live query, and a
             // lightbox pointing at a photo that no longer exists would land on
             // whatever slid into that index.
             setOpenIndex(null);
@@ -169,8 +117,8 @@ export function PhotoGallery({
               else await deleteJson(`/api/boards/${boardId}/photos/${photo.id}`, hostKey ?? undefined);
               setRemoved({ photo, wasMine });
             } catch {
-              // Nothing to roll back - the photo is still there and the strip
-              // still shows it.
+              // Nothing to roll back - the photo is still there and the
+              // gallery still shows it.
             }
           }}
         />
@@ -180,9 +128,9 @@ export function PhotoGallery({
 }
 
 // Undo is cheap only because deletion is soft: the document never left, so
-// putting a frame back is clearing two fields. Shown inline above the strips
+// putting a photo back is clearing two fields. Shown inline above the gallery
 // rather than as a floating toast, which would need fixed positioning and
-// would cover a frame on a phone.
+// would cover a photo on a phone.
 function UndoNotice({
   removed,
   boardId,
@@ -198,12 +146,13 @@ function UndoNotice({
   const { photo, wasMine } = removed;
 
   // Clears itself after a while so a stale "removed" line doesn't sit there
-  // all night. Keyed on the photo id so removing a second frame restarts it.
+  // all night. Keyed on the photo id so removing a second photo restarts it.
   useEffect(() => {
     const timer = setTimeout(onDone, 12000);
     return () => clearTimeout(timer);
   }, [photo.id, onDone]);
 
+  // Puts the photo back, through whichever path removed it.
   async function handleUndo() {
     setBusy(true);
     try {
@@ -219,14 +168,14 @@ function UndoNotice({
   }
 
   return (
-    <div className="flex items-center justify-between gap-3 border border-line bg-surface px-3 py-2">
-      <span className="min-w-0 truncate text-xs text-bone-dim">
-        Frame {photo.frameNumber} taken off the roll
+    <div className="flex items-center justify-between gap-3 rounded-2xl bg-surface py-2 pr-2 pl-5">
+      <span className="min-w-0 truncate text-[15px] text-bone-dim">
+        {wasMine ? "Your photo was removed" : `${photo.contributorName}'s photo was removed`}
       </span>
       <button
         onClick={handleUndo}
         disabled={busy}
-        className="shrink-0 text-xs text-safelight underline underline-offset-4 hover:text-bone disabled:opacity-30"
+        className="press shrink-0 rounded-full bg-bone px-4 py-2 text-[15px] font-semibold text-ink hover:bg-bone-dim disabled:opacity-30 outline-none focus-visible:ring-2 focus-visible:ring-safelight"
       >
         {busy ? "Undoing…" : "Undo"}
       </button>
@@ -234,51 +183,11 @@ function UndoNotice({
   );
 }
 
-// One continuous length of film running down the page, perforated down both
-// sides. The sprockets belong to the strip rather than to each frame, so the
-// perforations run unbroken past the rebate between one frame and the next -
-// which is the whole reason this reads as a roll rather than as a stack of
-// separate cards.
-function FilmStrip({
-  frames,
-  guestId,
-  boardId,
-  hostKey,
-  onRemoved,
-  onOpen,
-  commentsByPhoto,
-}: {
-  frames: RollPhoto[];
-  guestId: string;
-  boardId: string;
-  hostKey?: string | null;
-  onRemoved: (photo: RollPhoto, wasMine: boolean) => void;
-  onOpen: (photo: RollPhoto) => void;
-  commentsByPhoto: Map<string, Comment[]>;
-}) {
-  return (
-    <div className="flex min-w-0 flex-1 bg-frame">
-      <div className="sprocket-column" />
-      <div className="min-w-0 flex-1 py-1.5">
-        {frames.map((photo) => (
-          <PhotoFrame
-            key={photo.id}
-            photo={photo}
-            guestId={guestId}
-            boardId={boardId}
-            hostKey={hostKey}
-            onRemoved={onRemoved}
-            onOpen={onOpen}
-            commentCount={(commentsByPhoto.get(photo.id) ?? []).length}
-          />
-        ))}
-      </div>
-      <div className="sprocket-column" />
-    </div>
-  );
-}
-
-function PhotoFrame({
+// One photo on the wall: the image (or a video's still) on top, the caption if
+// there is one, then the contributor and the reaction counts, then the row of
+// reaction buttons. A flat #111 card with no border, set apart from the black
+// page by its lightness alone.
+function PhotoCard({
   photo,
   guestId,
   boardId,
@@ -324,33 +233,30 @@ function PhotoFrame({
   }
 
   return (
-    <div className="py-1.5">
+    // break-inside-avoid keeps a card from being split across two columns.
+    <div className="mb-2 break-inside-avoid overflow-hidden rounded-[10px] bg-surface">
       <div className="relative">
-        {/* 2:3 rather than 35mm's native 3:2, because these are phone photos.
-            A portrait shot survives this crop untouched where a landscape one
-            keeps 44% - and at a party, phones are held upright. No single
-            ratio is kind to both orientations, so this picks the common case. */}
-        {/* The frame is the trigger. A button rather than a click handler on
+        {/* The photo is the trigger. A button rather than a click handler on
             the image so it's reachable by keyboard and announced properly. */}
         <button
           onClick={() => onOpen(photo)}
-          aria-label={`Open frame ${photo.frameNumber} by ${photo.contributorName}`}
-          className="block w-full"
+          aria-label={`Open photo by ${photo.contributorName}`}
+          className="block w-full outline-none focus-visible:ring-2 focus-visible:ring-safelight focus-visible:ring-inset"
         >
           {/* Even a video shows a still here: the poster frame extracted at
               upload, or the video file itself as a fallback, which browsers
-              render as its first frame. A strip of autoplaying clips would be
+              render as its first frame. A wall of autoplaying clips would be
               unreadable and would pull the whole board over the wire. */}
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={galleryUrl(photo)}
             alt={photo.caption || (isVideo(photo) ? "Party video" : "Party photo")}
             loading="lazy"
-            className="aspect-2/3 w-full object-cover"
+            className="block h-auto w-full"
           />
 
           {isVideo(photo) && (
-            <span className="pointer-events-none absolute bottom-1 left-1 flex items-center gap-1 bg-ink/70 px-1.5 py-0.5 font-mono text-[11px] text-bone">
+            <span className="tabular pointer-events-none absolute bottom-2 left-2 flex items-center gap-1 rounded-full bg-ink/70 px-2.5 py-1 text-[13px] text-bone">
               <span aria-hidden="true">▶</span>
               {photo.durationSeconds !== null && formatDuration(photo.durationSeconds)}
             </span>
@@ -365,56 +271,50 @@ function PhotoFrame({
             onClick={handleRemove}
             disabled={removing}
             aria-label={isMine ? "Remove your photo" : "Remove this photo"}
-            className="absolute top-1 right-1 flex size-7 items-center justify-center bg-ink/60 text-xs text-bone/70 hover:bg-ink/80 hover:text-safelight disabled:opacity-30"
+            className="press absolute top-2 right-2 flex size-8 items-center justify-center rounded-full bg-ink/60 text-[13px] text-bone hover:bg-ink/80 disabled:opacity-30 outline-none focus-visible:ring-2 focus-visible:ring-safelight"
           >
             {removing ? "…" : "✕"}
           </button>
         )}
       </div>
 
-      {/* Caption and edge printing share one line: the caption takes whatever
-          is left and truncates, the frame number and contributor hold their
-          place at the end.
+      {/* Wraps in full: cards in a masonry wall don't have to match heights,
+          so there's no reason to cut a caption to one line any more. */}
+      {photo.caption && (
+        <p className="px-2.5 pt-2 text-[15px] leading-snug text-bone">{photo.caption}</p>
+      )}
 
-          Exactly one line either way, captioned or not. Frames on a roll are
-          identical by definition, and structurally dealIntoColumns keeps the
-          strips level only because it can assume equal heights - it has no way
-          to know that some frames are a line shorter. */}
-      <div className="flex items-baseline gap-2 pt-1.5">
-        <p className="min-w-0 flex-1 truncate text-xs leading-snug text-bone">{photo.caption}</p>
-        <p className="shrink-0 font-mono text-[11px] tracking-widest text-edge uppercase">
-          {photo.frameNumber} {photo.contributorName}
-        </p>
+      <div className="flex items-baseline justify-between gap-2 px-2.5 pt-2">
+        <p className="min-w-0 truncate text-[15px] font-medium text-bone">{photo.contributorName}</p>
+        {/* Not a button: the whole photo already opens the lightbox, so this
+            only has to signal that there's a conversation to find. */}
+        {commentCount > 0 && (
+          <p
+            aria-label={`${commentCount} comment${commentCount === 1 ? "" : "s"}`}
+            className="tabular shrink-0 text-[13px] text-bone-dim"
+          >
+            {commentCount} {commentCount === 1 ? "comment" : "comments"}
+          </p>
+        )}
       </div>
 
-      {/* On its own row rather than sharing the edge-printing line: a strip is
-          roughly half the width of the old grid card, and four reaction
-          targets alongside a name does not fit on a phone. */}
-      <div className="flex gap-0.5">
+      {/* The tap targets, each carrying its own count, so a reaction is read
+          and given in one place (no separate summary repeating them). */}
+      <div className="flex items-center gap-1 px-1.5 pt-1.5 pb-2">
         {REACTION_EMOJIS.map((emoji) => (
           <button
             key={emoji}
             onClick={() => setReaction(boardId, photo.id, guestId, emoji, myReaction)}
-            aria-label={`React ${emoji}`}
-            className={`flex min-w-7 flex-1 items-center justify-center gap-0.5 rounded-sm px-0.5 py-1.5 text-xs transition-transform active:scale-90 ${
-              myReaction === emoji ? "bg-safelight/15 text-safelight" : "text-bone-dim"
+            aria-label={`React ${emoji}${counts[emoji] ? `, ${counts[emoji]} so far` : ""}`}
+            aria-pressed={myReaction === emoji}
+            className={`press tabular flex h-8 min-w-0 flex-1 items-center justify-center gap-1 rounded-full text-[15px] outline-none focus-visible:ring-2 focus-visible:ring-safelight ${
+              myReaction === emoji ? "bg-surface-raised ring-2 ring-safelight ring-inset" : "hover:bg-surface-raised"
             }`}
           >
-            <span>{EMOJI_GLYPH[emoji]}</span>
-            {counts[emoji] > 0 && <span className="tabular-nums">{counts[emoji]}</span>}
+            <span aria-hidden="true">{EMOJI_GLYPH[emoji]}</span>
+            {counts[emoji] > 0 && <span className="text-[13px] text-bone-dim">{counts[emoji]}</span>}
           </button>
         ))}
-
-        {/* Not a button: the whole frame already opens the lightbox, so this
-            only has to signal that there's a conversation to find. */}
-        {commentCount > 0 && (
-          <span
-            aria-label={`${commentCount} comment${commentCount === 1 ? "" : "s"}`}
-            className="flex shrink-0 items-center gap-0.5 px-1 py-1.5 font-mono text-[11px] text-bone-faint"
-          >
-            {commentCount} ”
-          </span>
-        )}
       </div>
     </div>
   );

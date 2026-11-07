@@ -8,7 +8,7 @@ import { Comment, MAX_COMMENT_LENGTH } from "@/lib/types/comment";
 import { addComment, deleteOwnComment } from "@/lib/comments";
 import { updateCaption, MAX_CAPTION_LENGTH } from "@/lib/updateCaption";
 import { deleteJson } from "@/lib/api";
-import { inputClass } from "@/components/ui";
+import { inputClass, buttonPrimaryClass } from "@/components/ui";
 
 const EMOJI_GLYPH: Record<ReactionEmoji, string> = {
   heart: "❤️",
@@ -17,6 +17,7 @@ const EMOJI_GLYPH: Record<ReactionEmoji, string> = {
   wow: "😮",
 };
 
+// The hour and minute a photo went up, 24-hour, for the line above the photo.
 function shotAt(uploadedAt: number): string {
   return new Date(uploadedAt).toLocaleTimeString([], {
     hour: "2-digit",
@@ -25,12 +26,12 @@ function shotAt(uploadedAt: number): string {
   });
 }
 
-// Full view of a single frame.
+// Full view of a single photo, on an opaque black ground.
 //
-// The gallery crops every photo to 2:3, which suits a phone shot but throws
-// away more than half of a landscape one. This is where the photo is finally
-// shown whole - hence object-contain rather than object-cover - and where the
-// caption appears in full rather than truncated to the strip's one line.
+// The gallery shows each photo at card width; this is where it gets the whole
+// screen - object-contain so nothing is cropped - along with the reactions,
+// the caption editor and the comment thread. The backdrop is solid black, not
+// translucent, so the wall of photos behind doesn't show through.
 export function PhotoLightbox({
   frames,
   index,
@@ -93,29 +94,27 @@ export function PhotoLightbox({
     <div
       role="dialog"
       aria-modal="true"
-      aria-label={`Frame ${photo.frameNumber} by ${photo.contributorName}`}
-      className="fixed inset-0 z-50 flex flex-col bg-ink/95"
+      aria-label={`Photo by ${photo.contributorName}`}
+      className="fixed inset-0 z-50 flex flex-col bg-ink"
       // Clicking the backdrop closes. The inner panels stop propagation so a
       // tap on the photo or the caption doesn't dismiss what you opened.
       onClick={onClose}
     >
       <div
-        className="flex items-center justify-between gap-3 px-4 py-3"
+        className="flex items-center justify-between gap-3 py-2 pr-2 pl-4"
         onClick={(e) => e.stopPropagation()}
       >
-        <span className="truncate font-mono text-[11px] tracking-widest text-edge uppercase">
-          {photo.frameNumber} {photo.contributorName}
-        </span>
-        <div className="flex shrink-0 items-center gap-3">
-          <span className="font-mono text-[11px] text-bone-faint">{shotAt(photo.uploadedAt)}</span>
-          <button
-            onClick={onClose}
-            aria-label="Close"
-            className="flex size-8 items-center justify-center text-bone-dim hover:text-bone"
-          >
-            ✕
-          </button>
-        </div>
+        <p className="min-w-0 truncate text-[15px] text-bone-dim">
+          <span className="font-medium text-bone">{photo.contributorName}</span>
+          <span className="tabular"> · {shotAt(photo.uploadedAt)}</span>
+        </p>
+        <button
+          onClick={onClose}
+          aria-label="Close"
+          className="press flex size-10 shrink-0 items-center justify-center rounded-full bg-surface text-[15px] text-bone hover:bg-surface-raised outline-none focus-visible:ring-2 focus-visible:ring-safelight"
+        >
+          ✕
+        </button>
       </div>
 
       <div className="relative flex min-h-0 flex-1 items-center justify-center px-2">
@@ -125,8 +124,8 @@ export function PhotoLightbox({
               e.stopPropagation();
               goPrev();
             }}
-            aria-label="Newer frame"
-            className="absolute left-1 z-10 flex size-11 items-center justify-center text-bone-dim hover:text-bone"
+            aria-label="Newer photo"
+            className="press absolute left-2 z-10 flex size-11 items-center justify-center rounded-full bg-ink/60 text-2xl text-bone hover:bg-surface outline-none focus-visible:ring-2 focus-visible:ring-safelight"
           >
             ‹
           </button>
@@ -144,15 +143,15 @@ export function PhotoLightbox({
             playsInline
             preload="metadata"
             onClick={(e) => e.stopPropagation()}
-            className="max-h-full max-w-full object-contain"
+            className="max-h-full max-w-full rounded-[10px] object-contain"
           />
         ) : (
           /* eslint-disable-next-line @next/next/no-img-element */
           <img
             src={photo.downloadUrl}
-            alt={photo.caption || `Frame ${photo.frameNumber}`}
+            alt={photo.caption || `Photo by ${photo.contributorName}`}
             onClick={(e) => e.stopPropagation()}
-            className="max-h-full max-w-full object-contain"
+            className="max-h-full max-w-full rounded-[10px] object-contain"
           />
         )}
 
@@ -162,8 +161,8 @@ export function PhotoLightbox({
               e.stopPropagation();
               goNext();
             }}
-            aria-label="Older frame"
-            className="absolute right-1 z-10 flex size-11 items-center justify-center text-bone-dim hover:text-bone"
+            aria-label="Older photo"
+            className="press absolute right-2 z-10 flex size-11 items-center justify-center rounded-full bg-ink/60 text-2xl text-bone hover:bg-surface outline-none focus-visible:ring-2 focus-visible:ring-safelight"
           >
             ›
           </button>
@@ -171,14 +170,15 @@ export function PhotoLightbox({
       </div>
 
       <div
-        className="flex flex-col gap-3 px-4 py-4"
+        className="mx-auto flex w-full max-w-2xl flex-col gap-4 px-4 pt-4 pb-5"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Wrapping, not truncated - this is the only place the whole caption
-            is readable, since the strip has exactly one line for it, and the
-            only place it can be edited. */}
+        {/* Wrapping, not truncated - this is where the whole caption is
+            easiest to read, and the only place it can be edited. */}
+        {/* Both panels are keyed on the photo so stepping to another photo
+            resets them; the prefixes keep the two sibling keys distinct. */}
         <CaptionPanel
-          key={photo.id}
+          key={`caption-${photo.id}`}
           boardId={boardId}
           photoId={photo.id}
           caption={photo.caption}
@@ -186,18 +186,18 @@ export function PhotoLightbox({
         />
 
         <div className="flex items-center justify-between gap-3">
-          <div className="flex gap-1">
+          <div className="flex flex-wrap gap-2">
             {REACTION_EMOJIS.map((emoji) => (
               <button
                 key={emoji}
                 onClick={() => setReaction(boardId, photo.id, guestId, emoji, myReaction)}
                 aria-label={`React ${emoji}`}
-                className={`flex min-w-10 items-center justify-center gap-1 rounded-sm px-2 py-2 text-sm transition-transform active:scale-90 ${
-                  myReaction === emoji ? "bg-safelight/15 text-safelight" : "text-bone-dim"
+                className={`press flex h-10 min-w-12 items-center justify-center gap-1.5 rounded-full bg-surface px-3 text-[15px] outline-none hover:bg-surface-raised focus-visible:ring-2 focus-visible:ring-safelight ${
+                  myReaction === emoji ? "text-safelight ring-2 ring-safelight ring-inset" : "text-bone-dim"
                 }`}
               >
                 <span>{EMOJI_GLYPH[emoji]}</span>
-                {counts[emoji] > 0 && <span className="tabular-nums text-xs">{counts[emoji]}</span>}
+                {counts[emoji] > 0 && <span className="tabular">{counts[emoji]}</span>}
               </button>
             ))}
           </div>
@@ -205,7 +205,7 @@ export function PhotoLightbox({
           {canRemove(photo) && (
             <button
               onClick={() => onRemove(photo)}
-              className="shrink-0 text-xs text-bone-faint underline underline-offset-4 hover:text-safelight"
+              className="press shrink-0 rounded-full bg-surface px-4 py-2 text-[15px] text-bone-dim hover:bg-surface-raised hover:text-bone outline-none focus-visible:ring-2 focus-visible:ring-safelight"
             >
               Remove
             </button>
@@ -213,7 +213,7 @@ export function PhotoLightbox({
         </div>
 
         <CommentThread
-          key={photo.id}
+          key={`comments-${photo.id}`}
           boardId={boardId}
           photoId={photo.id}
           comments={comments}
@@ -222,7 +222,7 @@ export function PhotoLightbox({
           hostKey={hostKey}
         />
 
-        <p className="text-center font-mono text-[11px] text-bone-faint">
+        <p className="tabular text-center text-[13px] text-bone-faint">
           {index + 1} of {frames.length}
         </p>
       </div>
@@ -230,8 +230,8 @@ export function PhotoLightbox({
   );
 }
 
-// The thread for one frame. Keyed on photo id by the caller so moving to the
-// next frame resets the draft rather than carrying a half-typed comment over.
+// The thread for one photo. Keyed on photo id by the caller so moving to the
+// next photo resets the draft rather than carrying a half-typed comment over.
 function CommentThread({
   boardId,
   photoId,
@@ -251,6 +251,7 @@ function CommentThread({
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Posts the draft as a comment under the guest's name.
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     const body = draft.trim();
@@ -269,6 +270,8 @@ function CommentThread({
     }
   }
 
+  // Removes a comment: your own through the client, anyone's through the
+  // host route.
   async function handleRemove(comment: Comment) {
     const mine = comment.authorGuestId === guestId;
     try {
@@ -280,26 +283,24 @@ function CommentThread({
   }
 
   return (
-    <div className="flex flex-col gap-2 border-t border-line pt-3">
+    <div className="flex flex-col gap-3">
       {comments.length > 0 && (
         // Capped height so a long thread can't push the photo off screen on a
         // phone - the picture is still the point of this view.
-        <ul className="flex max-h-40 flex-col gap-2 overflow-y-auto">
+        <ul className="flex max-h-40 flex-col gap-2.5 overflow-y-auto">
           {comments.map((comment) => {
             const mine = comment.authorGuestId === guestId;
             return (
               <li key={comment.id} className="flex items-start justify-between gap-2">
-                <p className="min-w-0 text-xs leading-relaxed text-bone">
-                  <span className="font-mono text-[11px] tracking-widest text-edge uppercase">
-                    {comment.authorName}
-                  </span>{" "}
+                <p className="min-w-0 text-[15px] leading-relaxed text-bone-dim">
+                  <span className="font-medium text-bone">{comment.authorName}</span>{" "}
                   {comment.body}
                 </p>
                 {(mine || hostKey) && (
                   <button
                     onClick={() => handleRemove(comment)}
                     aria-label={mine ? "Remove your comment" : "Remove this comment"}
-                    className="shrink-0 text-[11px] text-bone-faint hover:text-safelight"
+                    className="press flex size-8 shrink-0 items-center justify-center rounded-full text-[13px] text-bone-faint hover:bg-surface hover:text-bone outline-none focus-visible:ring-2 focus-visible:ring-safelight"
                   >
                     ✕
                   </button>
@@ -318,27 +319,27 @@ function CommentThread({
             placeholder="Say something"
             maxLength={MAX_COMMENT_LENGTH}
             disabled={sending}
-            className={`${inputClass} py-2 text-xs`}
+            className={`${inputClass} rounded-full! py-2.5! text-[15px]!`}
           />
           <button
             type="submit"
             disabled={!draft.trim() || sending}
-            className="shrink-0 text-xs text-safelight underline underline-offset-4 hover:text-bone disabled:opacity-30"
+            className={`${buttonPrimaryClass} shrink-0 px-5! py-2.5! text-[15px]!`}
           >
             {sending ? "Posting…" : "Post"}
           </button>
         </form>
       ) : (
-        <p className="text-[11px] text-bone-faint">Set your name to comment.</p>
+        <p className="text-[15px] text-bone-faint">Set your name to comment.</p>
       )}
 
-      {error && <p className="text-xs text-safelight">{error}</p>}
+      {error && <p className="text-[15px] text-safelight">{error}</p>}
     </div>
   );
 }
 
 // The caption, and its editor when the photo is yours. Keyed on photo id by the
-// caller so stepping to the next frame drops a half-finished edit rather than
+// caller so stepping to the next photo drops a half-finished edit rather than
 // carrying it across to someone else's photo.
 function CaptionPanel({
   boardId,
@@ -356,6 +357,7 @@ function CaptionPanel({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Saves the edited caption and drops back to the read-only view.
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
     if (saving) return;
@@ -382,13 +384,13 @@ function CaptionPanel({
           placeholder="Caption"
           maxLength={MAX_CAPTION_LENGTH}
           disabled={saving}
-          className={`${inputClass} py-2 text-sm`}
+          className={`${inputClass} text-[17px]!`}
         />
         <div className="flex items-center gap-3">
           <button
             type="submit"
             disabled={saving}
-            className="text-xs text-safelight underline underline-offset-4 hover:text-bone disabled:opacity-30"
+            className={`${buttonPrimaryClass} px-5! py-2! text-[15px]!`}
           >
             {saving ? "Saving…" : "Save"}
           </button>
@@ -400,11 +402,11 @@ function CaptionPanel({
               setError(null);
             }}
             disabled={saving}
-            className="text-xs text-bone-faint underline underline-offset-4 hover:text-bone disabled:opacity-30"
+            className="press rounded-full bg-surface px-4 py-2 text-[15px] text-bone-dim hover:bg-surface-raised hover:text-bone disabled:opacity-30 outline-none focus-visible:ring-2 focus-visible:ring-safelight"
           >
             Cancel
           </button>
-          {error && <span className="text-xs text-safelight">{error}</span>}
+          {error && <span className="text-[15px] text-safelight">{error}</span>}
         </div>
       </form>
     );
@@ -414,7 +416,7 @@ function CaptionPanel({
     return canEdit ? (
       <button
         onClick={() => setEditing(true)}
-        className="self-start text-xs text-bone-faint underline underline-offset-4 hover:text-bone"
+        className="press self-start rounded-full bg-surface px-4 py-2 text-[15px] text-bone-dim hover:bg-surface-raised hover:text-bone disabled:opacity-30 outline-none focus-visible:ring-2 focus-visible:ring-safelight"
       >
         Add a caption
       </button>
@@ -423,11 +425,11 @@ function CaptionPanel({
 
   return (
     <div className="flex items-start justify-between gap-3">
-      <p className="min-w-0 text-sm leading-relaxed text-bone">{caption}</p>
+      <p className="min-w-0 text-[17px] leading-relaxed text-bone">{caption}</p>
       {canEdit && (
         <button
           onClick={() => setEditing(true)}
-          className="shrink-0 text-xs text-bone-faint underline underline-offset-4 hover:text-bone"
+          className="press shrink-0 rounded-full bg-surface px-4 py-2 text-[15px] text-bone-dim hover:bg-surface-raised hover:text-bone disabled:opacity-30 outline-none focus-visible:ring-2 focus-visible:ring-safelight"
         >
           Edit
         </button>

@@ -9,7 +9,6 @@ import {
   inputClass,
   buttonPrimaryClass,
   buttonSecondaryClass,
-  buttonDangerClass,
   labelClass,
 } from "@/components/ui";
 
@@ -24,6 +23,8 @@ type AdminBoard = {
   deletedCount: number;
 };
 
+// Every board on the project, with photo counts and a guarded permanent
+// delete. Only addresses in RECAP_ADMIN_EMAILS get a list back from the API.
 export default function AdminPage() {
   const { user, loading: authLoading } = useAuth();
   const [boards, setBoards] = useState<AdminBoard[] | null>(null);
@@ -47,6 +48,7 @@ export default function AdminPage() {
     []
   );
 
+  // Loads the list once someone is signed in.
   useEffect(() => {
     if (!user) return;
     load();
@@ -62,7 +64,7 @@ export default function AdminPage() {
         <span className="text-bone-faint">
           <LogoMark size={32} />
         </span>
-        <p className="text-lg font-medium">Admin</p>
+        <p className="text-[22px] font-bold tracking-tight">Admin</p>
         <button onClick={() => signInWithGoogle()} className={buttonPrimaryClass}>
           Sign in with Google
         </button>
@@ -71,34 +73,28 @@ export default function AdminPage() {
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-6 px-4 py-6">
-      <div className="border-b border-line pb-4">
-        <div className="flex items-center justify-between gap-3">
-          <Link
-            href="/boards"
-            className="text-xs text-bone-dim underline underline-offset-4 hover:text-bone"
-          >
+    <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-6 px-4 pt-3 pb-10">
+      <div>
+        <div className="flex h-14 items-center justify-between gap-3">
+          <Wordmark size={19} />
+          <Link href="/boards" className="text-[15px] text-bone-dim hover:text-bone">
             ← Your boards
           </Link>
-          <Wordmark size={18} />
         </div>
-        <h1 className="mt-3 text-xl font-medium tracking-tight">Admin</h1>
+        <h1 className="mt-2 text-[28px] leading-tight font-bold tracking-tight">Admin</h1>
       </div>
 
-      <div className="flex items-center justify-between text-xs text-bone-faint">
+      <div className="flex items-center justify-between gap-3 text-[15px] text-bone-dim">
         <span className="truncate">{user.email}</span>
-        <button
-          onClick={() => signOutHost()}
-          className="shrink-0 underline underline-offset-4 hover:text-bone"
-        >
+        <button onClick={() => signOutHost()} className={`${buttonSecondaryClass} shrink-0 px-4! py-2! text-[15px]!`}>
           Sign out
         </button>
       </div>
 
       {error && (
-        <div className="border border-line bg-surface p-4">
-          <p className="text-sm text-safelight">{error}</p>
-          <p className="mt-2 text-xs text-bone-faint">
+        <div className="rounded-2xl bg-surface p-5">
+          <p className="text-[15px] text-safelight">{error}</p>
+          <p className="mt-2 text-sm text-bone-faint">
             Admin access is set with RECAP_ADMIN_EMAILS in .env.local. Add the address above and
             restart the dev server.
           </p>
@@ -114,17 +110,17 @@ export default function AdminPage() {
             {boards.map((board) => (
               <li
                 key={board.id}
-                className="flex items-center justify-between gap-3 border border-line bg-surface px-4 py-3"
+                className="flex items-center justify-between gap-3 rounded-2xl bg-surface py-3 pr-3 pl-5"
               >
                 <div className="min-w-0">
                   <Link
                     href={`/host/${board.id}`}
-                    className="block truncate text-sm text-bone hover:text-safelight"
+                    className="block truncate text-[17px] font-medium text-bone hover:text-bone-dim"
                   >
                     {board.title}
                   </Link>
-                  <span className="mt-0.5 block font-mono text-[11px] tracking-widest text-bone-faint">
-                    {board.roomCode} · {new Date(board.createdAt).toLocaleDateString()} ·{" "}
+                  <span className="tabular mt-0.5 block text-sm text-bone-dim">
+                    <span className="font-medium tracking-[0.06em] text-bone">{board.roomCode}</span> · {new Date(board.createdAt).toLocaleDateString()} ·{" "}
                     {board.photoCount} photo{board.photoCount === 1 ? "" : "s"}
                     {board.deletedCount > 0 && ` · ${board.deletedCount} deleted`}
                     {!board.ownerUid && " · unowned"}
@@ -132,7 +128,7 @@ export default function AdminPage() {
                 </div>
                 <button
                   onClick={() => setConfirming(board)}
-                  className={`${buttonDangerClass} shrink-0`}
+                  className="press shrink-0 rounded-full bg-surface-raised px-4 py-2 text-[15px] text-bone-dim hover:bg-line-bright hover:text-bone outline-none focus-visible:ring-2 focus-visible:ring-safelight"
                 >
                   Delete
                 </button>
@@ -173,6 +169,7 @@ function DeleteBoardDialog({
   const [error, setError] = useState<string | null>(null);
   const matches = typed.trim().toUpperCase() === board.roomCode;
 
+  // Deletes the board for good, sending the typed code for the server to check.
   async function handleDelete() {
     setBusy(true);
     setError(null);
@@ -193,12 +190,12 @@ function DeleteBoardDialog({
         role="dialog"
         aria-modal="true"
         aria-labelledby="delete-board-title"
-        className="w-full max-w-sm border border-line bg-surface p-6"
+        className="w-full max-w-sm rounded-2xl bg-surface p-6"
       >
-        <h2 id="delete-board-title" className="text-lg font-medium tracking-tight">
+        <h2 id="delete-board-title" className="text-[22px] font-bold tracking-tight">
           Delete this board?
         </h2>
-        <p className="mt-2 text-sm text-bone-dim">
+        <p className="mt-2 text-[15px] text-bone-dim">
           {board.title} — {board.photoCount + board.deletedCount} photo
           {board.photoCount + board.deletedCount === 1 ? "" : "s"} and their files are removed
           permanently. This can&apos;t be undone.
@@ -211,17 +208,17 @@ function DeleteBoardDialog({
             value={typed}
             onChange={(e) => setTyped(e.target.value)}
             disabled={busy}
-            className={`${inputClass} mt-2 uppercase tracking-[0.3em]`}
+            className={`${inputClass} tabular mt-2 bg-surface-raised! uppercase tracking-[0.06em]`}
           />
         </label>
 
-        {error && <p className="mt-4 text-sm text-safelight">{error}</p>}
+        {error && <p className="mt-4 text-[15px] text-safelight">{error}</p>}
 
         <div className="mt-6 flex flex-col gap-2 sm:flex-row sm:justify-end">
-          <button onClick={onCancel} disabled={busy} className={buttonSecondaryClass}>
+          <button onClick={onCancel} disabled={busy} className={`${buttonSecondaryClass} bg-surface-raised!`}>
             Cancel
           </button>
-          <button onClick={handleDelete} disabled={!matches || busy} className={buttonDangerClass}>
+          <button onClick={handleDelete} disabled={!matches || busy} className={buttonPrimaryClass}>
             {busy ? "Deleting…" : "Delete permanently"}
           </button>
         </div>
@@ -230,8 +227,9 @@ function DeleteBoardDialog({
   );
 }
 
+// A single centred status line, for the loading state.
 function Centred({ children }: { children: React.ReactNode }) {
   return (
-    <div className="flex flex-1 items-center justify-center text-sm text-bone-dim">{children}</div>
+    <div className="flex flex-1 items-center justify-center text-[15px] text-bone-dim">{children}</div>
   );
 }

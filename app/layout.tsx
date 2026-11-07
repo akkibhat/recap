@@ -1,24 +1,27 @@
 import type { Metadata } from "next";
-import { IBM_Plex_Mono } from "next/font/google";
 import "./globals.css";
-
-const plexMono = IBM_Plex_Mono({
-  variable: "--font-plex-mono",
-  weight: ["400", "500"],
-  subsets: ["latin"],
-});
 
 export const metadata: Metadata = {
   title: "recap",
-  // Kept identical to the hero tagline on the home page - this is what shows
-  // in a link preview when someone shares the join URL, which is often the
-  // first thing a guest ever reads about the app.
-  description: "Everyone adds a frame. Everyone gets the roll.",
+  // Kept identical to the home page's headline idea - this is what shows in a
+  // link preview when someone shares the join URL, which is often the first
+  // thing a guest ever reads about the app.
+  description: "Everyone adds a photo to the roll. A shared photo board for one night.",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="en" className={`${plexMono.variable} h-full antialiased`}>
+    <html lang="en" className="h-full antialiased">
+      <head>
+        {/* General Sans comes from Fontshare (not on Google Fonts, so next/font
+            can't load it). Preconnect first so the headline doesn't wait. */}
+        <link rel="preconnect" href="https://api.fontshare.com" />
+        <link rel="preconnect" href="https://cdn.fontshare.com" crossOrigin="" />
+        <link
+          rel="stylesheet"
+          href="https://api.fontshare.com/v2/css?f[]=general-sans@400,500,600,700&display=swap"
+        />
+      </head>
       <body className="min-h-full flex flex-col bg-ink text-bone">{children}</body>
     </html>
   );

@@ -14,16 +14,21 @@ import { getOrCreateGuestId, getGuestName, setGuestName } from "@/lib/guestIdent
 import { postJson, getJson } from "@/lib/api";
 import { PhotoGallery } from "@/components/PhotoGallery";
 import { PhotoUploadForm } from "@/components/PhotoUploadForm";
-import { LogoMark, Wordmark } from "@/components/Logo";
+import { LogoMark } from "@/components/Logo";
+import { BoardHeader, BoardSubline } from "@/components/JoinBoardClient";
 import {
   inputClass,
   buttonPrimaryClass,
-  buttonSecondaryClass,
   buttonDangerClass,
   labelClass,
 } from "@/components/ui";
 
 type DeletedDecision = "restore" | "keep" | "purge";
+
+// A pill that sits inside a #111 panel, so it takes the next lightness step
+// (#2a2a2a) rather than the page-level secondary pill, which would vanish.
+const nestedPillClass =
+  "press rounded-full bg-surface-raised px-4 py-2 text-[15px] text-bone hover:bg-line-bright disabled:opacity-30 outline-none focus-visible:ring-2 focus-visible:ring-safelight";
 
 type EndResult = {
   archiveError: string | null;
@@ -34,6 +39,9 @@ type EndResult = {
   review: { restored: number; kept: number; purged: number; deletedAlbumUrl: string | null };
 };
 
+// The host's screen for one board: the room code and QR for guests to join,
+// export and Google Photos, the end-of-night flow, their own upload form and
+// the photo wall with moderation turned on.
 export function HostBoardClient({ boardId }: { boardId: string }) {
   const { data: board, loading } = useBoardById(boardId);
   const { data: photos } = usePhotos(boardId);
@@ -69,14 +77,15 @@ export function HostBoardClient({ boardId }: { boardId: string }) {
   const [qrForced, setQrForced] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Draws the join QR whenever the board (and so its room code) is known.
   useEffect(() => {
     if (!board) return;
     const joinUrl = `${window.location.origin}/join/${board.roomCode}`;
     // Deliberately standard polarity (dark modules on a light background).
     // Inverted QR codes read fine on most modern phones but fail on some
     // scanners, and a guest who can't scan can't join - not worth the risk
-    // for a nicer-looking code. It's framed as a bone "print" below, which
-    // suits the darkroom theme anyway.
+    // for a nicer-looking code. It sits on a white tile below, which gives it
+    // the quiet zone scanners need on a black page.
     QRCode.toDataURL(joinUrl, {
       width: 240,
       margin: 1,
@@ -119,6 +128,7 @@ export function HostBoardClient({ boardId }: { boardId: string }) {
     setConfirmingEnd(true);
   }
 
+  // Ends the board, with the archive choice and the removed-photo decisions.
   async function handleEnd() {
     if (!hostKey) return;
     setEnding(true);
@@ -138,6 +148,7 @@ export function HostBoardClient({ boardId }: { boardId: string }) {
     }
   }
 
+  // Sends the host off to Google to grant Photos access to their account.
   async function handleConnectGooglePhotos() {
     if (!hostKey) return;
     setConnecting(true);
@@ -157,14 +168,14 @@ export function HostBoardClient({ boardId }: { boardId: string }) {
 
   if (loading || !guestId) {
     return (
-      <div className="flex flex-1 items-center justify-center text-sm text-bone-dim">
+      <div className="flex flex-1 items-center justify-center text-[15px] text-bone-dim">
         Loading the roll…
       </div>
     );
   }
 
   if (!board) {
-    return <div className="flex flex-1 items-center justify-center text-sm text-bone-dim">Board not found.</div>;
+    return <div className="flex flex-1 items-center justify-center text-[15px] text-bone-dim">Board not found.</div>;
   }
 
   if (!hostKey) {
@@ -174,7 +185,7 @@ export function HostBoardClient({ boardId }: { boardId: string }) {
     // Still resolving: auth hasn't restored yet, or recovery is in flight.
     if (authLoading || recovering) {
       return (
-        <div className="flex flex-1 items-center justify-center text-sm text-bone-dim">
+        <div className="flex flex-1 items-center justify-center text-[15px] text-bone-dim">
           Finding your roll…
         </div>
       );
@@ -185,12 +196,12 @@ export function HostBoardClient({ boardId }: { boardId: string }) {
         <span className="text-bone-faint">
           <LogoMark size={32} />
         </span>
-        <p className="text-lg font-medium">You&apos;re not the host of this board</p>
-        <p className="text-sm text-bone-dim">
-          Join with the room code instead: <span className="text-safelight">{board.roomCode}</span>
+        <p className="text-[22px] font-bold tracking-tight">You&apos;re not the host of this board</p>
+        <p className="text-[15px] text-bone-dim">
+          Join with the room code instead: <span className="tabular font-medium text-safelight">{board.roomCode}</span>
         </p>
         {!user && (
-          <p className="text-xs text-bone-faint">
+          <p className="max-w-xs text-sm text-bone-faint">
             If you started this board while signed in, sign in on the home page to get it back.
           </p>
         )}
@@ -207,20 +218,19 @@ export function HostBoardClient({ boardId }: { boardId: string }) {
   const showQr = !rollUnderWay || qrForced;
 
   return (
-    <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-6 px-4 py-6">
-      <div className="border-b border-line pb-4">
-        <div className="flex items-center justify-between gap-3">
-          {/* Points wherever the host actually came from: their board list if
-              they're signed in, the home page otherwise. */}
-          <Link
-            href={user ? "/boards" : "/"}
-            className="text-xs text-bone-dim underline underline-offset-4 hover:text-bone"
-          >
-            ← {user ? "Your boards" : "Home"}
-          </Link>
-          <Wordmark size={18} />
-        </div>
-        <h1 className="mt-3 text-xl font-medium tracking-tight">{board.title}</h1>
+    <div className="mx-auto flex w-full max-w-5xl flex-1 flex-col gap-6 px-4 pt-3 pb-10">
+      <div>
+        <BoardHeader roomCode={board.roomCode} />
+        {/* Points wherever the host actually came from: their board list if
+            they're signed in, the home page otherwise. */}
+        <Link
+          href={user ? "/boards" : "/"}
+          className="mt-2 inline-block text-[15px] text-bone-dim hover:text-bone"
+        >
+          ← {user ? "Your boards" : "Home"}
+        </Link>
+        <h1 className="mt-2 text-[28px] leading-tight font-bold tracking-tight">{board.title}</h1>
+        <BoardSubline photos={photos} live={!board.endedAt} />
       </div>
 
       {board.endedAt ? (
@@ -232,7 +242,7 @@ export function HostBoardClient({ boardId }: { boardId: string }) {
           endResult={endResult}
         />
       ) : (
-        <div className="flex flex-col items-center gap-4 border border-line bg-surface p-6">
+        <div className="flex flex-col items-center gap-4 rounded-2xl bg-surface p-6 text-center">
           {/* The QR earns its 240px for the first few minutes and is in the way
               for the rest of the night - on a phone you scroll past it, the
               code and the buttons before reaching a single photo. Once the roll
@@ -241,77 +251,64 @@ export function HostBoardClient({ boardId }: { boardId: string }) {
           {qrDataUrl &&
             (showQr ? (
               <div className="flex flex-col items-center gap-3">
-                <div className="bg-bone p-3">
+                <div className="rounded-2xl bg-bone p-3">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src={qrDataUrl} alt="QR code to join" className="block" />
                 </div>
                 {rollUnderWay && (
-                  <button
-                    onClick={() => setQrForced(false)}
-                    className="text-xs text-bone-faint underline underline-offset-4 hover:text-bone"
-                  >
+                  <button onClick={() => setQrForced(false)} className={nestedPillClass}>
                     Hide QR
                   </button>
                 )}
               </div>
             ) : (
-              <button
-                onClick={() => setQrForced(true)}
-                className="text-xs text-bone-dim underline underline-offset-4 hover:text-bone"
-              >
+              <button onClick={() => setQrForced(true)} className={nestedPillClass}>
                 Show QR to join
               </button>
             ))}
-          {/* The room code as a length of film leader - the strip of exposed
-              film at the head of a roll, which is where the stock and speed
-              are printed. It's the one place in the app that gets the full
-              sprocketed treatment, since it's the hero of the host screen. */}
-          <div className="w-full max-w-xs bg-frame">
-            <div className="sprocket-edge" />
-            <div className="px-4 py-5 text-center">
-              <p className="font-mono text-[11px] tracking-[0.16em] text-edge">RECAP 400</p>
-              <p className="mt-2 text-4xl font-medium tracking-[0.3em] text-safelight">
-                {board.roomCode}
-              </p>
-              <p className="mt-2 font-mono text-[11px] tracking-widest text-bone-faint">
-                {photos.length === 0
-                  ? "NO FRAMES YET"
-                  : `${photos.length} FRAME${photos.length === 1 ? "" : "S"} SO FAR`}
-              </p>
-            </div>
-            <div className="sprocket-edge" />
+          {/* The room code is the hero of the host screen: large, white and
+              evenly spaced, so it can be read across a room. */}
+          <div className="flex flex-col items-center gap-2">
+            <p className="tabular text-[56px] leading-none font-bold tracking-[0.04em] text-bone">
+              {board.roomCode}
+            </p>
+            <p className="text-[15px] text-bone-dim">Scan, or go to /join/{board.roomCode}</p>
+            <p className="tabular text-[15px] text-bone-dim">
+              {photos.length === 0
+                ? "No photos yet"
+                : `${photos.length} photo${photos.length === 1 ? "" : "s"} so far`}
+            </p>
           </div>
-          <p className="text-xs text-bone-faint">Scan, or go to /join/{board.roomCode}</p>
 
           {/* Connection is a property of the signed-in account now, not of
               this board - connect once and every board can archive. A host
               who isn't signed in has nowhere to hang the grant, so they're
               pointed at sign-in rather than shown a button that can't work. */}
           {account?.googlePhotosConnected ? (
-            <p className="text-xs text-bone-dim">
+            <p className="text-sm text-bone-dim">
               Google Photos connected — you can archive there when you develop the roll.
             </p>
           ) : user ? (
             <button
               onClick={handleConnectGooglePhotos}
               disabled={connecting}
-              className="text-xs text-bone-dim underline underline-offset-4 hover:text-bone disabled:opacity-30"
+              className={nestedPillClass}
             >
               {connecting ? "Connecting…" : "Connect Google Photos (optional)"}
             </button>
           ) : (
-            <p className="text-xs text-bone-faint">Sign in to archive to Google Photos</p>
+            <p className="text-sm text-bone-faint">Sign in to archive to Google Photos</p>
           )}
 
-          <div className="flex w-full flex-col gap-2 border-t border-line pt-4 sm:flex-row sm:justify-center">
+          <div className="flex w-full flex-col gap-2 pt-2 sm:flex-row sm:justify-center">
             <a
               href={`/api/boards/${boardId}/export?hostKey=${hostKey}`}
-              className={`${buttonSecondaryClass} text-center`}
+              className={`${nestedPillClass} px-5! py-3! text-center`}
             >
               Download all as zip
             </a>
           </div>
-          {error && <p className="text-sm text-safelight">{error}</p>}
+          {error && <p className="text-[15px] text-safelight">{error}</p>}
         </div>
       )}
 
@@ -324,7 +321,7 @@ export function HostBoardClient({ boardId }: { boardId: string }) {
           <button onClick={openEndDialog} disabled={ending} className={buttonDangerClass}>
             Develop the roll
           </button>
-          <p className="text-[11px] text-bone-faint">Ends the night. Guests can&apos;t add more.</p>
+          <p className="text-[13px] text-bone-faint">Ends the night. Guests can&apos;t add more.</p>
         </div>
       )}
 
@@ -347,7 +344,9 @@ export function HostBoardClient({ boardId }: { boardId: string }) {
 
       {!board.endedAt &&
         (guestName ? (
-          <PhotoUploadForm boardId={boardId} guestId={guestId} guestName={guestName} />
+          <div className="w-full max-w-xl">
+            <PhotoUploadForm boardId={boardId} guestId={guestId} guestName={guestName} />
+          </div>
         ) : (
           <form
             onSubmit={(e) => {
@@ -356,7 +355,7 @@ export function HostBoardClient({ boardId }: { boardId: string }) {
               setGuestName(nameDraft.trim());
               setGuestNameState(nameDraft.trim());
             }}
-            className="flex gap-2"
+            className="flex w-full max-w-xl gap-2"
           >
             <input
               value={nameDraft}
@@ -365,7 +364,7 @@ export function HostBoardClient({ boardId }: { boardId: string }) {
               maxLength={40}
               className={inputClass}
             />
-            <button type="submit" disabled={!nameDraft.trim()} className={buttonPrimaryClass}>
+            <button type="submit" disabled={!nameDraft.trim()} className={`${buttonPrimaryClass} shrink-0`}>
               Set
             </button>
           </form>
@@ -419,15 +418,15 @@ function EndBoardDialog({
         role="dialog"
         aria-modal="true"
         aria-labelledby="end-board-title"
-        className="w-full max-w-sm border border-line bg-surface p-6"
+        className="max-h-[90vh] w-full max-w-sm overflow-y-auto rounded-2xl bg-surface p-6"
       >
-        <h2 id="end-board-title" className="text-lg font-medium tracking-tight">
+        <h2 id="end-board-title" className="text-[22px] font-bold tracking-tight">
           Develop this roll?
         </h2>
-        <p className="mt-2 text-sm text-bone-dim">Guests won&apos;t be able to add more frames.</p>
+        <p className="mt-2 text-[15px] text-bone-dim">Guests won&apos;t be able to add more photos.</p>
 
         {googlePhotosConnected && (
-          <label className="mt-5 flex cursor-pointer gap-3 border border-line p-3">
+          <label className="mt-5 flex cursor-pointer gap-3 rounded-2xl bg-surface-raised p-4">
             <input
               type="checkbox"
               checked={archiveOnEnd}
@@ -435,9 +434,9 @@ function EndBoardDialog({
               disabled={ending}
               className="mt-0.5 h-4 w-4 shrink-0 accent-safelight"
             />
-            <span className="text-sm">
+            <span className="text-[15px]">
               Also archive to Google Photos
-              <span className="mt-1 block text-xs text-bone-faint">
+              <span className="mt-1 block text-sm text-bone-dim">
                 Uploads every photo to the album, then removes the copies from Recap. Leave this
                 off while testing.
               </span>
@@ -454,13 +453,13 @@ function EndBoardDialog({
           />
         )}
 
-        {error && <p className="mt-4 text-sm text-safelight">{error}</p>}
+        {error && <p className="mt-4 text-[15px] text-safelight">{error}</p>}
 
         <div className="mt-6 flex flex-col gap-2 sm:flex-row sm:justify-end">
-          <button onClick={onCancel} disabled={ending} className={buttonSecondaryClass}>
+          <button onClick={onCancel} disabled={ending} className={nestedPillClass}>
             Cancel
           </button>
-          <button onClick={onConfirm} disabled={ending} className={buttonDangerClass}>
+          <button onClick={onConfirm} disabled={ending} className={buttonPrimaryClass}>
             {ending ? "Developing…" : "Develop the roll"}
           </button>
         </div>
@@ -492,6 +491,7 @@ function EndedPanel({
   const [savingShare, setSavingShare] = useState(false);
   const [shareError, setShareError] = useState<string | null>(null);
 
+  // Fetches the album link on a later visit, when endResult isn't there.
   useEffect(() => {
     if (albumUrl || !googlePhotosConnected) return;
     getJson<{ albumUrl: string | null }>(`/api/boards/${boardId}/google-photos`, hostKey)
@@ -499,6 +499,7 @@ function EndedPanel({
       .catch(() => setAlbumUrl(null));
   }, [albumUrl, googlePhotosConnected, boardId, hostKey]);
 
+  // Saves (or, with an empty string, clears) the guest-facing album link.
   async function saveShareUrl(value: string) {
     setSavingShare(true);
     setShareError(null);
@@ -513,35 +514,35 @@ function EndedPanel({
   }
 
   return (
-    <div className="flex flex-col gap-5 border border-line bg-surface p-6">
+    <div className="flex flex-col gap-7 rounded-2xl bg-surface p-6">
       <div>
         <p className={labelClass}>Roll developed</p>
-        <p className="mt-1 text-sm text-bone-dim">
+        <p className="mt-1 text-[15px] text-bone">
           {board.googlePhotosArchivedAt
             ? `${
-                endResult ? `${endResult.archivedCount} frames` : "Every frame"
+                endResult ? `${endResult.archivedCount} photos` : "Every photo"
               } archived to Google Photos, and removed from Recap.`
-            : "Every frame is still stored in Recap. Nothing was archived."}
+            : "Every photo is still stored in Recap. Nothing was archived."}
         </p>
         {endResult?.archiveError && (
-          <p className="mt-2 text-sm text-safelight">
+          <p className="mt-2 text-[15px] text-safelight">
             Archiving failed: {endResult.archiveError} — your photos are untouched.
           </p>
         )}
       </div>
 
       {albumUrl && (
-        <div className="border-t border-line pt-5">
+        <div>
           <p className={labelClass}>Your album</p>
           <a
             href={albumUrl}
             target="_blank"
             rel="noreferrer"
-            className="mt-2 block truncate text-sm text-safelight underline underline-offset-4"
+            className="mt-2 block truncate text-[15px] text-bone underline underline-offset-4 hover:text-bone-dim"
           >
             {albumUrl}
           </a>
-          <p className="mt-2 text-xs text-bone-faint">
+          <p className="mt-2 text-sm text-bone-faint">
             This one opens for you only — Google no longer lets apps share an album on your
             behalf.
           </p>
@@ -549,7 +550,7 @@ function EndedPanel({
       )}
 
       {googlePhotosConnected && (
-        <div className="border-t border-line pt-5">
+        <div>
           <p className={labelClass}>Guest link</p>
           {board.googlePhotosShareUrl ? (
             <>
@@ -557,24 +558,24 @@ function EndedPanel({
                 href={board.googlePhotosShareUrl}
                 target="_blank"
                 rel="noreferrer"
-                className="mt-2 block truncate text-sm text-safelight underline underline-offset-4"
+                className="mt-2 block truncate text-[15px] text-bone underline underline-offset-4 hover:text-bone-dim"
               >
                 {board.googlePhotosShareUrl}
               </a>
-              <p className="mt-2 text-xs text-bone-faint">
+              <p className="mt-2 text-sm text-bone-faint">
                 Guests see this when they open the board.
               </p>
               <button
                 onClick={() => saveShareUrl("")}
                 disabled={savingShare}
-                className="mt-3 text-xs text-bone-dim underline underline-offset-4 hover:text-bone disabled:opacity-30"
+                className={`${nestedPillClass} mt-3`}
               >
                 Remove it
               </button>
             </>
           ) : (
             <>
-              <p className="mt-2 text-xs text-bone-faint">
+              <p className="mt-2 text-sm text-bone-faint">
                 In Google Photos, open the album and tap Share → Create link, then paste it here so
                 guests can see the night.
               </p>
@@ -589,26 +590,26 @@ function EndedPanel({
                   value={shareDraft}
                   onChange={(e) => setShareDraft(e.target.value)}
                   placeholder="https://photos.app.goo.gl/…"
-                  className={inputClass}
+                  className={`${inputClass} bg-surface-raised!`}
                 />
                 <button
                   type="submit"
                   disabled={!shareDraft.trim() || savingShare}
-                  className={buttonPrimaryClass}
+                  className={`${buttonPrimaryClass} shrink-0`}
                 >
                   {savingShare ? "Saving…" : "Save"}
                 </button>
               </form>
             </>
           )}
-          {shareError && <p className="mt-2 text-sm text-safelight">{shareError}</p>}
+          {shareError && <p className="mt-2 text-[15px] text-safelight">{shareError}</p>}
         </div>
       )}
     </div>
   );
 }
 
-// What happens to frames taken off the roll during the night.
+// What happens to photos removed during the night.
 //
 // Keep is the default for anything untouched, and purging always needs a
 // deliberate tap. The reverse - destroy unless told otherwise - was considered
@@ -633,17 +634,17 @@ function DeletedReview({
   ];
 
   return (
-    <div className="mt-5 border-t border-line pt-4">
+    <div className="mt-6">
       <p className={labelClass}>
-        {photos.length} frame{photos.length === 1 ? "" : "s"} taken off the roll
+        {photos.length} photo{photos.length === 1 ? "" : "s"} removed during the night
       </p>
-      <p className="mt-1 text-xs text-bone-faint">
+      <p className="mt-1 text-sm text-bone-faint">
         {googlePhotosConnected
-          ? "Kept frames go to your Recap - Deleted Photos album. Nothing is deleted unless you say so."
-          : "Kept frames stay in Recap. Nothing is deleted unless you say so."}
+          ? "Kept photos go to your Recap - Deleted Photos album. Nothing is deleted unless you say so."
+          : "Kept photos stay in Recap. Nothing is deleted unless you say so."}
       </p>
 
-      <ul className="mt-3 flex flex-col gap-2">
+      <ul className="mt-3 flex flex-col gap-3">
         {photos.map((photo) => {
           const chosen = decisions[photo.id] ?? "keep";
           return (
@@ -651,11 +652,11 @@ function DeletedReview({
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={galleryUrl(photo)}
-                alt={photo.caption || "Removed frame"}
-                className="size-12 shrink-0 border border-line object-cover"
+                alt={photo.caption || "Removed photo"}
+                className="size-14 shrink-0 rounded-[10px] object-cover"
               />
               <div className="flex min-w-0 flex-1 flex-col gap-1">
-                <span className="truncate text-[11px] text-bone-dim">
+                <span className="truncate text-[13px] text-bone-dim">
                   {photo.contributorName}
                   {photo.deletedBy === "host" ? " · you removed it" : " · they removed it"}
                 </span>
@@ -665,12 +666,10 @@ function DeletedReview({
                       key={option.value}
                       type="button"
                       onClick={() => onDecide(photo.id, option.value)}
-                      className={`px-2 py-1 text-[11px] ${
+                      className={`press rounded-full px-3 py-1.5 text-[13px] outline-none focus-visible:ring-2 focus-visible:ring-safelight ${
                         chosen === option.value
-                          ? option.value === "purge"
-                            ? "bg-safelight/20 text-safelight"
-                            : "bg-line text-bone"
-                          : "text-bone-faint hover:text-bone"
+                          ? "bg-bone font-medium text-ink"
+                          : "bg-surface-raised text-bone-dim hover:text-bone"
                       }`}
                     >
                       {option.label}
