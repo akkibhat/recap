@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { postJson } from "@/lib/api";
+import { useAuth, signInWithGoogle } from "@/lib/hooks/useAuth";
 import { saveHostKey } from "@/lib/hostIdentity";
 import { Wordmark } from "@/components/Logo";
 import { HostSignIn } from "@/components/HostSignIn";
@@ -35,6 +36,25 @@ export default function Home() {
   const [showCredits, setShowCredits] = useState(false);
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { user, loading: authLoading } = useAuth();
+  const [signingIn, setSigningIn] = useState(false);
+
+  /** Sign in with Google so this browser can start boards. */
+  async function handleHostSignIn() {
+    setSigningIn(true);
+    setError(null);
+    try {
+      await signInWithGoogle();
+    } catch (err) {
+      const code = typeof err === "object" && err && "code" in err ? String(err.code) : "";
+      // Closing the popup yourself isn't an error worth showing.
+      if (code !== "auth/popup-closed-by-user" && code !== "auth/cancelled-popup-request") {
+        setError("Sign-in didn't complete. Try again.");
+      }
+    } finally {
+      setSigningIn(false);
+    }
+  }
 
   /** Create a board, keep its host key in this browser, go to the host screen. */
   async function handleCreate(e: React.FormEvent) {
@@ -86,6 +106,19 @@ export default function Home() {
         </p>
 
         <div style={{ animationDelay: "220ms" }} className="rise mt-10 flex flex-col gap-6 sm:flex-row sm:flex-wrap sm:items-center sm:gap-10">
+          {/* Only signed-in hosts can start a board (the server enforces it,
+              see lib/hostAccess.ts). Signed out, the pink action is signing in;
+              guests never need it, they join with a code. */}
+          {!user ? (
+            <button
+              type="button"
+              onClick={handleHostSignIn}
+              disabled={authLoading || signingIn}
+              className={`${buttonBrandClass} h-[60px] w-full max-w-[520px] text-lg sm:w-auto`}
+            >
+              {signingIn ? "Signing in…" : "Sign in to start a board"}
+            </button>
+          ) : (
           <form onSubmit={handleCreate} className="flex w-full max-w-[520px] flex-col gap-3 sm:flex-row sm:gap-0">
             <label htmlFor="title" className="sr-only">
               Name the night
@@ -106,6 +139,7 @@ export default function Home() {
               {creating ? "Starting…" : "Start a board"}
             </button>
           </form>
+          )}
 
           {showJoin ? (
             <form onSubmit={handleJoin} className="flex items-center gap-3">

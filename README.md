@@ -31,8 +31,9 @@ near-black, one safelight red, IBM Plex Mono throughout.
 - **Developing the roll**: at the end, the host reviews anything removed during the night (put
   back, keep or delete), then archives the board to a Google Photos album (batched, resumable)
   or downloads it as a streamed zip.
-- **Hosts**: optional Google sign-in keeps your boards in one list and recovers a board's host
-  key on a new device. An admin page can list and fully delete boards.
+- **Hosts**: starting a board needs a Google sign-in on the host allow-list
+  (`RECAP_HOST_EMAILS`), which also keeps your boards in one list and recovers a board's host key
+  on a new device. Guests never sign in. An admin page can list and fully delete boards.
 
 ## Built with
 
@@ -56,7 +57,9 @@ Working end to end, including a real Google Photos archive, but not public yet. 
 
 - **Guest identity**: guests are identified by a random id in their browser. That's fine among
   friends holding a room code, but proper guest auth should come before strangers can join.
-- **Limits**: no rate limiting or per-board caps yet, and boards don't expire.
+- **Limits**: only allow-listed hosts can create boards, and guest uploads and comments are only
+  accepted into boards that exist and are still open (enforced in the Firestore and Storage
+  rules). There's still no per-board cap, and boards don't expire.
 - **Real-device testing**: video poster frames and archiving video to Google Photos haven't
   been through a real phone yet.
 - **Sharing**: Google no longer lets apps share albums they created (since March 2025), so the

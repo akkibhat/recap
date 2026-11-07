@@ -1,38 +1,29 @@
 import { NextRequest, NextResponse } from "next/server";
 import { nanoid } from "nanoid";
-import { getAuth } from "firebase-admin/auth";
-import { adminDb, adminApp } from "@/lib/firebase/admin";
+import { adminDb } from "@/lib/firebase/admin";
+import { requireHostAccount } from "@/lib/hostAccess";
 import { newBoardFields } from "@/lib/types/board";
 import { newBoardSecretFields } from "@/lib/types/boardSecret";
 import { generateRoomCode } from "@/lib/roomCode";
 
 const MAX_ROOM_CODE_ATTEMPTS = 5;
 
+/** Create a board: allowed hosts only, returns its id, room code and host key. */
 export async function POST(req: NextRequest) {
   const { title } = await req.json();
   if (typeof title !== "string" || title.trim().length === 0) {
     return NextResponse.json({ error: "A title is required." }, { status: 400 });
   }
 
+  // Only allowed host accounts may start a board (see lib/hostAccess.ts).
+  // Checked before anything is written, so a refused request costs nothing.
+  const host = await requireHostAccount(req);
+  if (!host.ok) return host.response;
+  const ownerUid = host.uid;
+
   const roomCode = await findUnusedRoomCode();
   if (!roomCode) {
     return NextResponse.json({ error: "Could not allocate a room code, try again." }, { status: 500 });
-  }
-
-  // Signing in is optional. Creating a board without it still works and still
-  // mints a hostKey - it just produces a board that can't be recovered if the
-  // browser is cleared, which is exactly the pre-sign-in behaviour.
-  const authHeader = req.headers.get("authorization");
-  let ownerUid: string | null = null;
-  if (authHeader?.startsWith("Bearer ")) {
-    try {
-      ownerUid = (await getAuth(adminApp).verifyIdToken(authHeader.slice(7))).uid;
-    } catch {
-      // A token that doesn't verify is treated as no token at all rather than
-      // a failure. An expired session shouldn't stop someone starting a board
-      // at a party; it only costs them the recovery path.
-      ownerUid = null;
-    }
   }
 
   const hostKey = nanoid(24);

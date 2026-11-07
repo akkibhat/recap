@@ -3,6 +3,15 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
+    // A guest write (photo, comment) is only accepted into a board that
+    // really exists and hasn't been ended. Without this, anyone holding the
+    // project's public web config could write into any made-up board id.
+    // Costs one document read per write.
+    function boardIsOpen(boardId) {
+      return exists(/databases/$(database)/documents/boards/$(boardId))
+          && get(/databases/$(database)/documents/boards/$(boardId)).data.endedAt == null;
+    }
+
     // Created and ended only via server API routes using the Admin SDK, which
     // bypasses these rules entirely - so no client write path is needed here.
     //
@@ -43,7 +52,8 @@ service cloud.firestore {
         //
         // No boardId in this list any more: the path is the only record of
         // which board a photo belongs to, so the two can never disagree.
-        allow create: if request.resource.data.keys().hasAll(
+        allow create: if boardIsOpen(boardId)
+                      && request.resource.data.keys().hasAll(
                           ['storagePath', 'downloadUrl', 'contentType', 'caption',
                            'contributorName', 'contributorGuestId', 'uploadedAt', 'reactedBy']
                         )
@@ -105,7 +115,8 @@ service cloud.firestore {
 
         // Same trust model as uploading a photo - no auth - but the shape is
         // validated so a malformed write can't corrupt what everyone reads.
-        allow create: if request.resource.data.keys().hasAll(
+        allow create: if boardIsOpen(boardId)
+                      && request.resource.data.keys().hasAll(
                           ['photoId', 'body', 'authorName', 'authorGuestId',
                            'createdAt', 'deletedAt', 'deletedBy']
                         )

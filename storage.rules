@@ -14,13 +14,20 @@ service firebase.storage {
     // the 5GB free tier isn't gone in a handful of uploads.
     match /boards/{boardId}/photos/{fileName} {
       allow read: if true;
-      allow write: if (
+      // Only into a board that exists in Firestore and hasn't ended. This is
+      // what stops someone using the public web config to fill the bucket
+      // with files for made-up board ids, bypassing the site entirely.
+      // (Cross-service rules: the Storage service agent needs read access to
+      // Firestore; the Firebase CLI offers to grant it on first deploy.)
+      allow write: if firestore.exists(/databases/(default)/documents/boards/$(boardId))
+                   && firestore.get(/databases/(default)/documents/boards/$(boardId)).data.endedAt == null
+                   && ((
                      request.resource.contentType.matches('image/.*')
                      && request.resource.size < 15 * 1024 * 1024
                    ) || (
                      request.resource.contentType.matches('video/.*')
                      && request.resource.size < 50 * 1024 * 1024
-                   );
+                   ));
       allow delete: if false;
     }
   }
