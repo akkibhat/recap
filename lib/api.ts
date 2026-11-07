@@ -17,6 +17,13 @@ async function hostHeaders(hostKey?: string): Promise<Record<string, string>> {
   return headers;
 }
 
+// Parses a JSON reply, throwing the server's error message on a non-2xx status.
+async function readJson<T>(res: Response): Promise<T> {
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error ?? `Request failed (${res.status})`);
+  return data as T;
+}
+
 // POSTs a JSON body with the host headers and returns the parsed reply, or
 // throws the server's error message.
 export async function postJson<T>(url: string, body: unknown, hostKey?: string): Promise<T> {
@@ -25,10 +32,7 @@ export async function postJson<T>(url: string, body: unknown, hostKey?: string):
     headers: { "Content-Type": "application/json", ...(await hostHeaders(hostKey)) },
     body: JSON.stringify(body),
   });
-
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error ?? `Request failed (${res.status})`);
-  return data as T;
+  return readJson<T>(res);
 }
 
 // `body` is optional because most deletes identify their target entirely in
@@ -44,10 +48,7 @@ export async function deleteJson<T>(url: string, hostKey?: string, body?: unknow
     },
     ...(body === undefined ? {} : { body: JSON.stringify(body) }),
   });
-
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error ?? `Request failed (${res.status})`);
-  return data as T;
+  return readJson<T>(res);
 }
 
 // Same error handling as postJson, for the handful of host-only reads that
@@ -55,8 +56,5 @@ export async function deleteJson<T>(url: string, hostKey?: string, body?: unknow
 // because that collection is closed to every client.
 export async function getJson<T>(url: string, hostKey?: string): Promise<T> {
   const res = await fetch(url, { headers: await hostHeaders(hostKey) });
-
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error ?? `Request failed (${res.status})`);
-  return data as T;
+  return readJson<T>(res);
 }

@@ -12,7 +12,13 @@ type AdminAuthResult = { ok: true; email: string } | { ok: false; response: Next
 // tradeoff is that email is less stable than a uid, which is fine for a
 // single-owner personal tool and would not be for anything multi-tenant.
 function allowedEmails(): string[] {
-  return (process.env.RECAP_ADMIN_EMAILS ?? "")
+  return parseEmailList(process.env.RECAP_ADMIN_EMAILS ?? "");
+}
+
+// Splits a comma-separated env var into trimmed, lower-case emails, dropping
+// blanks. Shared with the host allow-list in lib/hostAccess.ts.
+export function parseEmailList(raw: string): string[] {
+  return raw
     .split(",")
     .map((entry) => entry.trim().toLowerCase())
     .filter(Boolean);

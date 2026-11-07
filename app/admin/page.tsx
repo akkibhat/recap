@@ -12,16 +12,8 @@ import {
   labelClass,
 } from "@/components/ui";
 
-type AdminBoard = {
-  id: string;
-  title: string;
-  roomCode: string;
-  createdAt: number;
-  endedAt: number | null;
-  ownerUid: string | null;
-  photoCount: number;
-  deletedCount: number;
-};
+// Type-only import of the list route's response row; erased at build.
+import type { AdminBoard } from "@/app/api/admin/boards/route";
 
 // Every board on the project, with photo counts and a guarded permanent
 // delete. Only addresses in RECAP_ADMIN_EMAILS get a list back from the API.

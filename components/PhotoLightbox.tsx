@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { REACTION_EMOJIS, reactionCounts, isVideo, ReactionEmoji } from "@/lib/types/photo";
+import { REACTION_EMOJIS, REACTION_GLYPH, reactionCounts, isVideo } from "@/lib/types/photo";
 import type { RollPhoto } from "@/lib/hooks/usePhotos";
 import { setReaction } from "@/lib/setReaction";
 import { Comment, MAX_COMMENT_LENGTH } from "@/lib/types/comment";
@@ -9,13 +9,6 @@ import { addComment, deleteOwnComment } from "@/lib/comments";
 import { updateCaption, MAX_CAPTION_LENGTH } from "@/lib/updateCaption";
 import { deleteJson } from "@/lib/api";
 import { inputClass, buttonPrimaryClass } from "@/components/ui";
-
-const EMOJI_GLYPH: Record<ReactionEmoji, string> = {
-  heart: "❤️",
-  laugh: "😂",
-  fire: "🔥",
-  wow: "😮",
-};
 
 // The hour and minute a photo went up, 24-hour, for the line above the photo.
 function shotAt(uploadedAt: number): string {
@@ -196,7 +189,7 @@ export function PhotoLightbox({
                   myReaction === emoji ? "text-safelight ring-2 ring-safelight ring-inset" : "text-bone-dim"
                 }`}
               >
-                <span>{EMOJI_GLYPH[emoji]}</span>
+                <span>{REACTION_GLYPH[emoji]}</span>
                 {counts[emoji] > 0 && <span className="tabular">{counts[emoji]}</span>}
               </button>
             ))}

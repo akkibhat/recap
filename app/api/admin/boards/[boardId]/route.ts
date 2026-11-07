@@ -6,6 +6,15 @@ import { normaliseBoard } from "@/lib/types/board";
 // Firestore caps a batched write at 500 operations.
 const BATCH_LIMIT = 500;
 
+// Deletes every document in a snapshot, BATCH_LIMIT at a time.
+async function deleteAll(snap: FirebaseFirestore.QuerySnapshot): Promise<void> {
+  for (let i = 0; i < snap.docs.length; i += BATCH_LIMIT) {
+    const batch = adminDb.batch();
+    for (const doc of snap.docs.slice(i, i + BATCH_LIMIT)) batch.delete(doc.ref);
+    await batch.commit();
+  }
+}
+
 // Permanently removes a board and everything belonging to it: photo documents,
 // the Storage objects behind them, the board's secret, and the board itself.
 //
@@ -39,21 +48,13 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ b
   await bucket.deleteFiles({ prefix: `boards/${boardId}/` });
 
   const photosSnap = await adminDb.collection("boards").doc(boardId).collection("photos").get();
-  for (let i = 0; i < photosSnap.docs.length; i += BATCH_LIMIT) {
-    const batch = adminDb.batch();
-    for (const doc of photosSnap.docs.slice(i, i + BATCH_LIMIT)) batch.delete(doc.ref);
-    await batch.commit();
-  }
+  await deleteAll(photosSnap);
 
   // Deleting a document in Firestore does NOT delete its subcollections, so
   // comments have to be cleared explicitly. Skipping this would leave orphaned
   // comments that nothing can ever reach or remove.
   const commentsSnap = await adminDb.collection("boards").doc(boardId).collection("comments").get();
-  for (let i = 0; i < commentsSnap.docs.length; i += BATCH_LIMIT) {
-    const batch = adminDb.batch();
-    for (const doc of commentsSnap.docs.slice(i, i + BATCH_LIMIT)) batch.delete(doc.ref);
-    await batch.commit();
-  }
+  await deleteAll(commentsSnap);
 
   await adminDb.collection("boardSecrets").doc(boardId).delete();
   await adminDb.collection("boards").doc(boardId).delete();

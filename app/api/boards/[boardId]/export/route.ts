@@ -3,7 +3,7 @@ import { Readable } from "node:stream";
 import * as archiver from "archiver";
 import { adminDb, adminStorage } from "@/lib/firebase/admin";
 import { requireHostKey } from "@/lib/hostAuth";
-import { normalisePhoto, isVisible } from "@/lib/types/photo";
+import { normalisePhoto, isVisible, storageFilename } from "@/lib/types/photo";
 import { normaliseBoard } from "@/lib/types/board";
 
 // Streams every visible photo on the board to the host as a zip download.
@@ -33,7 +33,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ boar
     // route by which something a guest removed still gets handed out.
     if (!isVisible(photo)) continue;
 
-    const filename = photo.storagePath.split("/").pop() ?? `${photo.id}.jpg`;
+    const filename = storageFilename(photo);
     archive.append(bucket.file(photo.storagePath).createReadStream(), {
       name: `${photo.contributorName}-${filename}`,
     });

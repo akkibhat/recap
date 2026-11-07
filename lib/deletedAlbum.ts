@@ -1,6 +1,6 @@
 import { adminDb, adminStorage } from "@/lib/firebase/admin";
 import { normaliseUserSecret } from "@/lib/types/userAccount";
-import { Photo } from "@/lib/types/photo";
+import { Photo, storageFilename } from "@/lib/types/photo";
 import { refreshAccessToken, createAlbum, uploadPhotoBytes, createMediaItems } from "@/lib/googlePhotos";
 
 // The one Google Photos album, per account, that kept deleted photos go into.
@@ -89,7 +89,7 @@ export async function applyDeletedReview(
         const [bytes] = await bucket.file(photo.storagePath).download();
         const uploadToken = await uploadPhotoBytes(accessToken, bytes, photo.contentType);
         await createMediaItems(accessToken, album.id, [
-          { uploadToken, filename: photo.storagePath.split("/").pop() ?? `${photo.id}.jpg` },
+          { uploadToken, filename: storageFilename(photo) },
         ]);
         outcome.kept++;
       }

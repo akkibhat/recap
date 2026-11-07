@@ -3,6 +3,14 @@ export type ReactionEmoji = "heart" | "laugh" | "fire" | "wow";
 
 export const REACTION_EMOJIS: ReactionEmoji[] = ["heart", "laugh", "fire", "wow"];
 
+// The glyph shown for each reaction, shared by the gallery and the lightbox.
+export const REACTION_GLYPH: Record<ReactionEmoji, string> = {
+  heart: "❤️",
+  laugh: "😂",
+  fire: "🔥",
+  wow: "😮",
+};
+
 // Lives at boards/{boardId}/photos/{photoId}. There is deliberately no
 // boardId field: the path is the only record of which board a photo belongs
 // to, so the two can never disagree.
@@ -108,6 +116,12 @@ export function reactionCounts(photo: Photo): Record<ReactionEmoji, number> {
     counts[emoji]++;
   }
   return counts;
+}
+
+// The file name part of a photo's Storage path, used when naming it in the
+// zip export and in Google Photos.
+export function storageFilename(photo: Photo): string {
+  return photo.storagePath.split("/").pop() ?? `${photo.id}.jpg`;
 }
 
 // True when the upload is a video rather than a still.

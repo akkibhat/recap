@@ -2,6 +2,7 @@
 
 import { useRef, useState } from "react";
 import { uploadPhoto } from "@/lib/uploadPhoto";
+import { MAX_CAPTION_LENGTH } from "@/lib/updateCaption";
 import { inputClass, buttonPrimaryClass } from "@/components/ui";
 
 // One queued photo waiting to be sent. previewUrl is an object URL, so it
@@ -167,7 +168,7 @@ export function PhotoUploadForm({
                   value={item.caption}
                   onChange={(e) => updateCaption(item.id, e.target.value)}
                   placeholder="Caption (optional)"
-                  maxLength={280}
+                  maxLength={MAX_CAPTION_LENGTH}
                   disabled={uploading}
                   className={`${inputClass} bg-surface-raised! py-2.5! text-[15px]!`}
                 />

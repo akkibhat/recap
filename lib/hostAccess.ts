@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAuth } from "firebase-admin/auth";
 import { adminApp } from "@/lib/firebase/admin";
+import { parseEmailList } from "@/lib/adminAuth";
 
 type HostAccessResult = { ok: true; uid: string; email: string } | { ok: false; response: NextResponse };
 
@@ -11,11 +12,7 @@ type HostAccessResult = { ok: true; uid: string; email: string } | { ok: false; 
 // RECAP_ADMIN_EMAILS (the owner), and with neither set nobody can create a
 // board - it fails closed, never open.
 function allowedHostEmails(): string[] {
-  const raw = process.env.RECAP_HOST_EMAILS || process.env.RECAP_ADMIN_EMAILS || "";
-  return raw
-    .split(",")
-    .map((entry) => entry.trim().toLowerCase())
-    .filter(Boolean);
+  return parseEmailList(process.env.RECAP_HOST_EMAILS || process.env.RECAP_ADMIN_EMAILS || "");
 }
 
 /** Gate for creating a board: a verified Google sign-in on the allow-list. */

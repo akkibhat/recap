@@ -1,5 +1,5 @@
 import { adminDb, adminStorage } from "@/lib/firebase/admin";
-import { normalisePhoto, isVisible, Photo } from "@/lib/types/photo";
+import { normalisePhoto, isVisible, storageFilename, Photo } from "@/lib/types/photo";
 import { normaliseBoard } from "@/lib/types/board";
 import { normaliseBoardSecret } from "@/lib/types/boardSecret";
 import { normaliseUserSecret } from "@/lib/types/userAccount";
@@ -131,7 +131,7 @@ export async function archiveBoardToGooglePhotos(boardId: string): Promise<Archi
       album.id,
       chunk.map(({ photo, uploadToken }) => ({
         uploadToken,
-        filename: photo.storagePath.split("/").pop() ?? `${photo.id}.jpg`,
+        filename: storageFilename(photo),
       }))
     );
 

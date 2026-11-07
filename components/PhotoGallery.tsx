@@ -1,13 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   REACTION_EMOJIS,
+  REACTION_GLYPH,
   reactionCounts,
   galleryUrl,
   isVideo,
   formatDuration,
-  ReactionEmoji,
 } from "@/lib/types/photo";
 import type { RollPhoto } from "@/lib/hooks/usePhotos";
 import { setReaction } from "@/lib/setReaction";
@@ -15,13 +15,6 @@ import { deleteOwnPhoto, restoreOwnPhoto } from "@/lib/deletePhoto";
 import { deleteJson, postJson } from "@/lib/api";
 import { PhotoLightbox } from "@/components/PhotoLightbox";
 import { useCommentsByPhoto } from "@/lib/hooks/useComments";
-
-const EMOJI_GLYPH: Record<ReactionEmoji, string> = {
-  heart: "❤️",
-  laugh: "😂",
-  fire: "🔥",
-  wow: "😮",
-};
 
 // The board's photos as a masonry wall of flat cards, newest first, plus the
 // undo notice and the lightbox they open into.
@@ -53,6 +46,9 @@ export function PhotoGallery({
   // Index into the displayed order, not a photo id: the lightbox needs to step
   // to the neighbouring photo, which an id alone can't express.
   const [openIndex, setOpenIndex] = useState<number | null>(null);
+  // Stable, so the undo notice's auto-clear timer only restarts when a new
+  // photo is removed, not on every live update to the gallery.
+  const clearRemoved = useCallback(() => setRemoved(null), []);
 
   if (photos.length === 0 && !removed) {
     return (
@@ -75,7 +71,7 @@ export function PhotoGallery({
           removed={removed}
           boardId={boardId}
           hostKey={hostKey}
-          onDone={() => setRemoved(null)}
+          onDone={clearRemoved}
         />
       )}
 
@@ -310,7 +306,7 @@ function PhotoCard({
               myReaction === emoji ? "bg-surface-raised ring-2 ring-safelight ring-inset" : "hover:bg-surface-raised"
             }`}
           >
-            <span aria-hidden="true">{EMOJI_GLYPH[emoji]}</span>
+            <span aria-hidden="true">{REACTION_GLYPH[emoji]}</span>
             {counts[emoji] > 0 && <span className="text-[13px] text-bone-dim">{counts[emoji]}</span>}
           </button>
         ))}

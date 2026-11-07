@@ -23,7 +23,8 @@ import {
   labelClass,
 } from "@/components/ui";
 
-type DeletedDecision = "restore" | "keep" | "purge";
+// Type-only import: erased at build, so no server code reaches the browser.
+import type { DeletedDecision, ReviewOutcome } from "@/lib/deletedAlbum";
 
 // A pill that sits inside a #111 panel, so it takes the next lightness step
 // (#2a2a2a) rather than the page-level secondary pill, which would vanish.
@@ -36,7 +37,7 @@ type EndResult = {
   skippedCount: number;
   albumUrl: string | null;
   reviewError: string | null;
-  review: { restored: number; kept: number; purged: number; deletedAlbumUrl: string | null };
+  review: ReviewOutcome;
 };
 
 // The host's screen for one board: the room code and QR for guests to join,
