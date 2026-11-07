@@ -28,18 +28,12 @@
   --color-surface: #111111;
   --color-surface-raised: #2a2a2a;
 
-  /* Kept for real form fields and tables only (allowed to carry a line). */
-  --color-line: #2a2a2a;
+  /* Hover step above surface-raised. */
   --color-line-bright: #3d3d3d;
 
   /* The brand accent. "safelight" kept as the name so existing uses follow. */
   --color-safelight: #ff488b;
   --color-safelight-dim: #d93a75;
-
-  /* Retired film tokens, mapped onto the new surfaces so nothing breaks. */
-  --color-frame: #111111;
-  --color-frame-line: #111111;
-  --color-edge: #bbbbbb;
 
   /* Text: white, a soft grey for secondary, a muted grey that still passes
      4.5:1 on black (#8a8a8a is 6:1). */

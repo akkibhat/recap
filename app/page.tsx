@@ -88,7 +88,7 @@ export default function Home() {
     <div className="flex min-h-svh flex-1 flex-col bg-plum">
       <header className="flex h-[76px] items-center justify-between px-4 sm:px-8">
         <Wordmark size={22} />
-        <HostSignIn variant="header" />
+        <HostSignIn />
       </header>
 
       <main className="flex flex-1 flex-col px-4 sm:px-8">

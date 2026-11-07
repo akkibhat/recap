@@ -23,10 +23,9 @@ function signInMessage(err: unknown): string | null {
   return message || "Sign-in didn't complete.";
 }
 
-// The host's sign-in control. Hosts need it to start a board; guests never do.
-// `variant="header"` is the compact version for the top bar of the home page:
-// a single "Sign in", or "Your boards · Sign out" once signed in.
-export function HostSignIn({ variant = "default" }: { variant?: "default" | "header" }) {
+// The host's sign-in control in the home page's top bar: a single "Sign in",
+// or "Your boards · Sign out" once signed in. Guests never need it.
+export function HostSignIn() {
   const { user, loading } = useAuth();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -46,11 +45,9 @@ export function HostSignIn({ variant = "default" }: { variant?: "default" | "hea
 
   if (loading) return <div className="h-6" />;
 
-  const header = variant === "header";
-
   if (user) {
     return (
-      <div className={`flex items-center gap-3 text-bone-dim ${header ? "text-[17px]" : "justify-center text-sm"}`}>
+      <div className="flex items-center gap-3 text-bone-dim text-[17px]">
         <Link href="/boards" className="press text-bone hover:opacity-70">
           Your boards
         </Link>
@@ -62,33 +59,17 @@ export function HostSignIn({ variant = "default" }: { variant?: "default" | "hea
     );
   }
 
-  if (header) {
-    return (
-      <div className="flex flex-col items-end gap-1">
-        <button
-          onClick={() => run(signInWithGoogle)}
-          disabled={busy}
-          title="Optional. Signing in keeps your boards across devices."
-          className="press text-[17px] text-bone hover:opacity-70 disabled:opacity-30"
-        >
-          {busy ? "Signing in…" : "Sign in"}
-        </button>
-        {error && <p className="max-w-[260px] text-right text-sm text-safelight">{error}</p>}
-      </div>
-    );
-  }
-
   return (
-    <div className="flex flex-col items-center gap-1">
+    <div className="flex flex-col items-end gap-1">
       <button
         onClick={() => run(signInWithGoogle)}
         disabled={busy}
-        className="press text-sm text-bone underline decoration-safelight decoration-2 underline-offset-4 hover:decoration-bone disabled:opacity-30"
+        title="Optional. Signing in keeps your boards across devices."
+        className="press text-[17px] text-bone hover:opacity-70 disabled:opacity-30"
       >
-        {busy ? "Signing in…" : "Sign in to keep your boards"}
+        {busy ? "Signing in…" : "Sign in"}
       </button>
-      <p className="text-center text-sm text-bone-faint">Optional. Without it a board only lives in this browser.</p>
-      {error && <p className="text-sm text-safelight">{error}</p>}
+      {error && <p className="max-w-[260px] text-right text-sm text-safelight">{error}</p>}
     </div>
   );
 }

@@ -34,8 +34,5 @@ export const buttonDangerClass =
   "press rounded-full bg-surface px-5 py-3 text-base text-bone-dim hover:bg-surface-raised hover:text-bone disabled:opacity-30 " +
   "outline-none focus-visible:ring-2 focus-visible:ring-safelight";
 
-// A panel is one lightness step up from the page.
-export const panelClass = "rounded-2xl bg-surface p-5";
-
 // Section labels: sentence case at a readable size, never tiny capitals.
 export const labelClass = "text-sm font-medium text-bone-dim";

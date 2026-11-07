@@ -19,11 +19,6 @@ export type UserSecret = {
   deletedAlbumUrl: string | null;
 };
 
-// The starting state for a host who hasn't connected anything yet.
-export function newUserAccountFields(): UserAccount {
-  return { googlePhotosConnected: false, googlePhotosConnectedAt: null };
-}
-
 // Fills defaults for any field missing on the users/{uid} document.
 export function normaliseUserAccount(data: Partial<UserAccount>): UserAccount {
   return {
