@@ -286,7 +286,7 @@ export function HostBoardClient({ boardId }: { boardId: string }) {
               grant, so they're pointed at sign-in instead. */}
           {account?.googlePhotosConnected ? (
             <p className="text-sm text-bone-dim">
-              Google Photos connected — you can archive there when you develop the roll.
+              Google Photos connected. You can archive there when you develop the roll.
             </p>
           ) : user ? (
             <button
@@ -525,7 +525,7 @@ function EndedPanel({
         </p>
         {endResult?.archiveError && (
           <p className="mt-2 text-[15px] text-safelight">
-            Archiving failed: {endResult.archiveError} — your photos are untouched.
+            Archiving failed: {endResult.archiveError}. Your photos are untouched.
           </p>
         )}
       </div>
@@ -542,7 +542,7 @@ function EndedPanel({
             {albumUrl}
           </a>
           <p className="mt-2 text-sm text-bone-faint">
-            This one opens for you only — Google no longer lets apps share an album on your
+            This one opens for you only. Google no longer lets apps share an album on your
             behalf.
           </p>
         </div>

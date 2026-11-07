@@ -107,7 +107,7 @@ export function PhotoUploadForm({
       setPending((current) => current.filter((p) => !sentIds.has(p.id)));
       setError(
         sent.length > 0
-          ? `Added ${sent.length}, then hit an error. The rest are still here — try again.`
+          ? `Added ${sent.length}, then hit an error. The rest are still here, so try again.`
           : err instanceof Error
             ? err.message
             : "Upload failed, try again."

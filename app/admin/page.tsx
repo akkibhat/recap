@@ -188,7 +188,7 @@ function DeleteBoardDialog({
           Delete this board?
         </h2>
         <p className="mt-2 text-[15px] text-bone-dim">
-          {board.title} — {board.photoCount + board.deletedCount} photo
+          {board.title} · {board.photoCount + board.deletedCount} photo
           {board.photoCount + board.deletedCount === 1 ? "" : "s"} and their files are removed
           permanently. This can&apos;t be undone.
         </p>

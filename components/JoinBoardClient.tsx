@@ -31,7 +31,7 @@ export function JoinBoardClient({ roomCode }: { roomCode: string }) {
 
   if (!board) {
     return (
-      <CentredMessage title="No board with that code" detail={`Double check it — you tried ${roomCode}.`} />
+      <CentredMessage title="No board with that code" detail={`Double check it. You tried ${roomCode}.`} />
     );
   }
 
@@ -44,7 +44,7 @@ export function JoinBoardClient({ roomCode }: { roomCode: string }) {
         title={board.title}
         detail={
           board.googlePhotosShareUrl
-            ? "This board has ended — the photos are up."
+            ? "This board has ended, and the photos are up."
             : "This board has ended."
         }
         action={
