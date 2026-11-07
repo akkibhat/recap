@@ -17,6 +17,8 @@ async function hostHeaders(hostKey?: string): Promise<Record<string, string>> {
   return headers;
 }
 
+// POSTs a JSON body with the host headers and returns the parsed reply, or
+// throws the server's error message.
 export async function postJson<T>(url: string, body: unknown, hostKey?: string): Promise<T> {
   const res = await fetch(url, {
     method: "POST",

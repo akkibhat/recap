@@ -6,6 +6,7 @@ import { requireHostKey } from "@/lib/hostAuth";
 import { normalisePhoto, isVisible } from "@/lib/types/photo";
 import { normaliseBoard } from "@/lib/types/board";
 
+// Streams every visible photo on the board to the host as a zip download.
 export async function GET(req: NextRequest, { params }: { params: Promise<{ boardId: string }> }) {
   const { boardId } = await params;
   const auth = await requireHostKey(req, boardId);
@@ -19,15 +20,13 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ boar
   const bucket = adminStorage.bucket();
 
   // `store: true` rather than deflate. Everything going in here is a JPEG, a
-  // PNG or an MP4 - all already compressed - so the old zlib level 9 spent a
-  // lot of CPU per photo to save approximately nothing.
+  // PNG or an MP4 - all already compressed - so deflating them spends a lot
+  // of CPU to save almost nothing.
   const archive = new archiver.ZipArchive({ store: true });
 
   // Nothing is awaited here: appending from a read stream is lazy, so the
-  // archive pulls each photo from Storage as the client drains the response.
-  // The previous version downloaded every photo into a Buffer and then
-  // concatenated the entire zip in memory, so peak usage was the size of the
-  // whole board - a few hundred photos was enough to exhaust the function.
+  // archive pulls each photo from Storage as the client drains the response,
+  // so memory stays flat instead of growing with the size of the board.
   for (const doc of photosSnap.docs) {
     const photo = normalisePhoto(doc.id, doc.data());
     // A deleted photo shouldn't reappear in the zip - that would be the one

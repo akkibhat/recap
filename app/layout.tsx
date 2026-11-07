@@ -9,6 +9,7 @@ export const metadata: Metadata = {
   description: "Everyone adds a photo to the roll. A shared photo board for one night.",
 };
 
+// The page shell for every route: loads General Sans and sets the black ground.
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="en" className="h-full antialiased">

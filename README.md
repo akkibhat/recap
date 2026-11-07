@@ -13,9 +13,9 @@ or a zip, so the group gets to relive it together afterwards, not just during.
 ## How it feels
 
 It's built around a 35mm roll. A board is a roll, a photo is a frame, and ending the board
-develops it. The gallery runs as continuous film strips with the sprockets on the strip, the
-room code is printed like edge markings, and the whole thing is set in a darkroom palette:
-near-black, one safelight red, IBM Plex Mono throughout.
+develops it. The screens are flat and true black, so the only colour comes from the photos. The
+gallery is a masonry wall where each photo keeps its own shape, one hot pink marks what's live
+or important, and the type is General Sans throughout.
 
 ## What it does
 

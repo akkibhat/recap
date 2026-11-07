@@ -7,11 +7,10 @@ export type Board = {
   title: string;
   createdAt: number;
   endedAt: number | null;
-  // The Google account that created this board, when the host was signed in.
-  // Null for boards made before sign-in existed, and for anyone who creates
-  // one without signing in - both keep working on the hostKey alone. This is
-  // what makes a board survive a cleared browser, and what the admin page and
-  // "my boards" list query against.
+  // The Google account that created this board. Creating one now requires
+  // sign-in, so this is only null for boards made before that, which keep
+  // working on the hostKey alone. This is what makes a board survive a
+  // cleared browser, and what the admin page and "my boards" list use.
   ownerUid: string | null;
   // Set once the archive has run AND the Storage copies have been deleted.
   // Doubles as the signal that photo.downloadUrl is now dead, so the gallery
@@ -25,6 +24,7 @@ export type Board = {
   googlePhotosShareUrl: string | null;
 };
 
+// The full document for a brand-new board.
 export function newBoardFields(input: {
   title: string;
   roomCode: string;

@@ -7,6 +7,8 @@ import { storage, db } from "@/lib/firebase/client";
 import { newPhotoFields } from "@/lib/types/photo";
 import { probeMedia } from "@/lib/makeThumbnail";
 
+// Uploads one photo or video (plus its thumbnail, if one could be made) to
+// Storage, then adds its document to the board.
 export async function uploadPhoto(input: {
   boardId: string;
   file: File;

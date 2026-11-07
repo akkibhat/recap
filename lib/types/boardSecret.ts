@@ -5,9 +5,12 @@ export type BoardSecret = {
   hostKey: string;
   googlePhotosAlbumId: string | null;
   googlePhotosAlbumUrl: string | null;
+  // No longer read: the refresh token now lives on the account, in
+  // userSecrets. Still written as null on new boards.
   googlePhotosRefreshToken: string | null;
 };
 
+// The full secret document for a brand-new board.
 export function newBoardSecretFields(input: { hostKey: string }): BoardSecret {
   return {
     hostKey: input.hostKey,
@@ -17,6 +20,7 @@ export function newBoardSecretFields(input: { hostKey: string }): BoardSecret {
   };
 }
 
+// Fills defaults for any field missing on an older or partial document.
 export function normaliseBoardSecret(data: Partial<BoardSecret>): BoardSecret {
   return {
     hostKey: data.hostKey ?? "",

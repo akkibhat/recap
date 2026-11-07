@@ -3,17 +3,16 @@ import { normaliseUserSecret } from "@/lib/types/userAccount";
 import { Photo } from "@/lib/types/photo";
 import { refreshAccessToken, createAlbum, uploadPhotoBytes, createMediaItems } from "@/lib/googlePhotos";
 
+// The one Google Photos album, per account, that kept deleted photos go into.
 export const DELETED_ALBUM_TITLE = "Recap - Deleted Photos";
 
 // What the host chose for a photo they (or a guest) removed during the night.
 export type DeletedDecision = "restore" | "keep" | "purge";
 
 // Keeping is the default for anything the host didn't explicitly decide.
-//
-// The original proposal was to purge on no-action, which was rejected: it
-// inverts the whole point of soft delete, and this screen appears exactly when
-// a tired host is tapping through to finish. Wrongly keeping a photo costs a
-// few megabytes; wrongly destroying one is permanent.
+// This screen appears when a tired host is tapping through to finish, and
+// wrongly keeping a photo costs a few megabytes; wrongly destroying one is
+// permanent.
 export const DEFAULT_DECISION: DeletedDecision = "keep";
 
 // One album per Google account, not per board - the whole point is that it's

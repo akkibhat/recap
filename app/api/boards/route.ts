@@ -37,6 +37,7 @@ export async function POST(req: NextRequest) {
   return NextResponse.json({ boardId: boardRef.id, roomCode, hostKey });
 }
 
+// Tries a few random room codes and returns the first one no board uses yet.
 async function findUnusedRoomCode(): Promise<string | null> {
   for (let attempt = 0; attempt < MAX_ROOM_CODE_ATTEMPTS; attempt++) {
     const candidate = generateRoomCode();

@@ -30,28 +30,20 @@ service cloud.firestore {
 
       allow write: if false;
 
-      // Photos and comments both live UNDER their board rather than in
-      // top-level collections with a boardId field. That is a rules decision.
-      //
-      // A top-level collection can only be read with a where("boardId", ...)
-      // filter, and Firestore list rules cannot inspect a query's filters - so
-      // any rule permitting the gallery's own query also permitted listing
-      // every photo on the project. For photos that leaked downloadUrl, which
-      // carries its own Storage access token, so it exposed the pictures
-      // themselves rather than just metadata.
-      //
-      // Nesting scopes a list by path: a caller must already know a board id,
-      // which is the same thing knowing the room code gets you.
+      // Photos and comments live UNDER their board, not in top-level
+      // collections with a boardId field. List rules can't inspect a query's
+      // filters, so a top-level collection readable by the gallery's query
+      // would be listable in full - and a photo's downloadUrl carries its own
+      // Storage token, so that would expose the pictures themselves. Nesting
+      // scopes a list by path: a caller must already know a board id.
       match /photos/{photoId} {
         allow read: if true;
 
         // Guests never log in, so there's no auth check - anyone who knows a
-        // boardId can add a photo, the same trust model as knowing the room
-        // code or QR at all. The shape is validated so a malformed write can't
-        // corrupt what every other guest reads.
-        //
-        // No boardId in this list any more: the path is the only record of
-        // which board a photo belongs to, so the two can never disagree.
+        // boardId can add a photo to an open board, the same trust model as
+        // knowing the room code. The shape is validated so a malformed write
+        // can't corrupt what every other guest reads. There's no boardId
+        // field: the path is the only record of which board a photo is on.
         allow create: if boardIsOpen(boardId)
                       && request.resource.data.keys().hasAll(
                           ['storagePath', 'downloadUrl', 'contentType', 'caption',
@@ -65,29 +57,17 @@ service cloud.firestore {
                       && request.resource.data.contributorName.size() <= 40
                       && request.resource.data.reactedBy == {};
 
-        // Guests have no real identity (no Firebase Auth), just a
-        // client-generated id in localStorage - so this can't cryptographically
-        // guarantee a guest only edits their own entry, only that reactedBy is
-        // the sole field anyone is ever allowed to touch after creation. That's
-        // the honest boundary available without adding a full auth system.
-        //
-        // Clause 2 is the uploader editing their own caption. Like the delete
-        // clauses it validates shape but cannot verify WHO is editing - there
-        // is no guest auth, and contributorGuestId is readable by anyone who
-        // can read the photo. One asymmetry is worth naming: a delete can be
-        // undone, an edit overwrites the previous text.
-        //
-        // Clause 3 is a guest deleting their own photo: the claimed deleter
-        // must match the recorded contributor, so a client can't casually
-        // remove someone else's. Since both are the same spoofable localStorage
-        // id that's a speed bump, not a guarantee - it's only safe because
-        // deletion is soft. This write hides a photo, never destroys one. The
-        // host's moderation goes through an API route with the host key, which
-        // the Admin SDK enforces properly.
-        //
-        // Clause 4 is undo, permitted only when the photo was removed by its
-        // own contributor - so a guest can take back their own mistake but
-        // cannot reverse a host's moderation, which sets deletedBy 'host'.
+        // Guests have no real identity, just a localStorage id, so none of
+        // these clauses can verify WHO is writing - only which fields change.
+        //   1. Reactions: reactedBy is the only field touched.
+        //   2. Caption edit: shape and length only. Unlike a delete, an edit
+        //      overwrites the old text and can't be undone.
+        //   3. Soft delete by a guest: deletedBy must equal the recorded
+        //      contributor. Both are spoofable ids, so this is a speed bump;
+        //      it's safe only because the write hides a photo, never destroys
+        //      it. Host moderation goes through the Admin SDK instead.
+        //   4. Undo: only when the contributor removed it themselves, so a
+        //      guest can't reverse a host removal (deletedBy 'host').
         allow update: if request.resource.data.diff(resource.data).affectedKeys().hasOnly(['reactedBy'])
                       || (
                            request.resource.data.diff(resource.data).affectedKeys().hasOnly(['caption'])

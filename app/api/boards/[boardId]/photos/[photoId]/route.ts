@@ -3,7 +3,7 @@ import { adminDb } from "@/lib/firebase/admin";
 import { requireHostKey } from "@/lib/hostAuth";
 
 // Host moderation. Unlike the guest path in lib/deletePhoto.ts, this is
-// properly enforced - the host key is checked server-side and the Admin SDK
+// properly enforced - host access is checked server-side and the Admin SDK
 // bypasses the Firestore rules entirely, so the host can remove anyone's
 // photo, not only their own.
 //
@@ -17,9 +17,8 @@ export async function DELETE(
   const auth = await requireHostKey(req, boardId);
   if (!auth.ok) return auth.response;
 
-  // Nesting means a photo cannot belong to another board by construction, so
-  // the explicit cross-board ownership check this route used to need is now
-  // the path itself.
+  // Nesting means a photo can't belong to another board: the path is the
+  // ownership check.
   const photoRef = adminDb.collection("boards").doc(boardId).collection("photos").doc(photoId);
   if (!(await photoRef.get()).exists) {
     return NextResponse.json({ error: "Photo not found." }, { status: 404 });

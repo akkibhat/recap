@@ -4,6 +4,7 @@
 const REDIRECT_URI = process.env.GOOGLE_OAUTH_REDIRECT_URI ?? "http://localhost:3001/api/google-photos/callback";
 const SCOPE = "https://www.googleapis.com/auth/photoslibrary.appendonly";
 
+// Reads a required env var, failing loudly if Google Photos isn't set up.
 function requireEnv(name: string): string {
   const value = process.env[name];
   if (!value) throw new Error(`Missing ${name} - Google Photos isn't configured yet.`);
@@ -28,6 +29,7 @@ export function getGooglePhotosAuthUrl(state: string): string {
   return `https://accounts.google.com/o/oauth2/v2/auth?${params}`;
 }
 
+// Swaps the one-time code from the OAuth callback for access and refresh tokens.
 export async function exchangeCodeForTokens(code: string): Promise<{ accessToken: string; refreshToken: string | null }> {
   const res = await fetch("https://oauth2.googleapis.com/token", {
     method: "POST",
@@ -45,6 +47,7 @@ export async function exchangeCodeForTokens(code: string): Promise<{ accessToken
   return { accessToken: data.access_token, refreshToken: data.refresh_token ?? null };
 }
 
+// Gets a fresh short-lived access token from the stored refresh token.
 export async function refreshAccessToken(refreshToken: string): Promise<string> {
   const res = await fetch("https://oauth2.googleapis.com/token", {
     method: "POST",
@@ -61,6 +64,7 @@ export async function refreshAccessToken(refreshToken: string): Promise<string> 
   return data.access_token;
 }
 
+// Creates a new app-owned album and returns its id and link.
 export async function createAlbum(accessToken: string, title: string): Promise<{ id: string; productUrl: string }> {
   const res = await fetch("https://photoslibrary.googleapis.com/v1/albums", {
     method: "POST",
@@ -81,8 +85,7 @@ export async function uploadPhotoBytes(
   accessToken: string,
   imageBytes: Buffer,
   // Google rejects the upload if this doesn't match the bytes, so it has to be
-  // the type recorded at upload rather than a hardcoded guess. Videos were
-  // silently impossible while this said image/jpeg.
+  // the type recorded at upload rather than a hardcoded guess.
   contentType: string
 ): Promise<string> {
   const res = await fetch("https://photoslibrary.googleapis.com/v1/uploads", {
@@ -102,9 +105,6 @@ export async function uploadPhotoBytes(
 export type CreatedMediaItem = { uploadToken: string; mediaItemId: string | null };
 
 // Step two: turn up to 50 upload tokens into album entries in a single call.
-// This used to run once per photo, so a hundred-photo board made two hundred
-// round trips to Google instead of a hundred and two.
-//
 // Returns each token's resulting media item id so the caller can record which
 // photos are already in the album, which is what makes a retry skip them.
 export async function createMediaItems(

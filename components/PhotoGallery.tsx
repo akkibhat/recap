@@ -27,7 +27,7 @@ const EMOJI_GLYPH: Record<ReactionEmoji, string> = {
 // undo notice and the lightbox they open into.
 //
 // The layout is plain CSS columns: two on a phone, three from `sm`, four from
-// `lg`. Each card keeps its photo's own shape, so a landscape shot is no longer
+// `lg`. Each card keeps its photo's own shape, so a landscape shot isn't
 // cropped to a portrait frame, and the columns balance themselves without any
 // measuring in JavaScript. CSS columns fill top to bottom, so the newest photo
 // sits at the top of the first column.
@@ -278,8 +278,7 @@ function PhotoCard({
         )}
       </div>
 
-      {/* Wraps in full: cards in a masonry wall don't have to match heights,
-          so there's no reason to cut a caption to one line any more. */}
+      {/* Wraps in full: cards in a masonry wall don't have to match heights. */}
       {photo.caption && (
         <p className="px-2.5 pt-2 text-[15px] leading-snug text-bone">{photo.caption}</p>
       )}

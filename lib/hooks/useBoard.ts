@@ -6,6 +6,7 @@ import { db } from "@/lib/firebase/client";
 import { normaliseBoard, Board } from "@/lib/types/board";
 import { useDocumentData } from "./useFirestore";
 
+// The live board document for an id, or null while there's no id.
 export function useBoardById(boardId: string | null) {
   const ref = useMemo(() => (boardId ? doc(db, "boards", boardId) : null), [boardId]);
   return useDocumentData<Board>(ref, normaliseBoard);

@@ -13,6 +13,7 @@ export type AuthState = {
   loading: boolean;
 };
 
+// The signed-in Firebase user (hosts only), kept live as they sign in or out.
 export function useAuth(): AuthState {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
@@ -29,18 +30,20 @@ export function useAuth(): AuthState {
   return { user, loading };
 }
 
+// Opens Google's sign-in popup.
 export async function signInWithGoogle(): Promise<void> {
   await signInWithPopup(auth, new GoogleAuthProvider());
 }
 
+// Signs the host out of this browser.
 export async function signOutHost(): Promise<void> {
   await signOut(auth);
 }
 
 // The bearer token every host-privileged API route accepts as an alternative
 // to a board's hostKey. Returns null when nobody is signed in, which is a
-// normal state here rather than an error - a host who never signed in still
-// has their key in localStorage.
+// normal state here rather than an error - a host who isn't signed in on this
+// device can still have the board's key in localStorage.
 export async function getIdToken(): Promise<string | null> {
   return auth.currentUser ? auth.currentUser.getIdToken() : null;
 }

@@ -1,3 +1,4 @@
+// The four reactions a guest can give a photo, stored by name.
 export type ReactionEmoji = "heart" | "laugh" | "fire" | "wow";
 
 export const REACTION_EMOJIS: ReactionEmoji[] = ["heart", "laugh", "fire", "wow"];
@@ -40,21 +41,13 @@ export type Photo = {
   deletedBy: string | null;
 };
 
+// The full document for a new upload (fields as described on Photo above).
 export function newPhotoFields(input: {
   storagePath: string;
   downloadUrl: string;
-  // A downscaled copy for the gallery. Null when the browser couldn't make one
-  // (an odd format, or an image already small enough to be its own thumbnail),
-  // in which case every read site falls back to the full-size downloadUrl - so
-  // a missing thumbnail costs bandwidth, never a broken frame.
   thumbPath: string | null;
   thumbUrl: string | null;
-  // The uploaded file's MIME type. Stored rather than guessed from the file
-  // extension because the Google Photos upload needs it verbatim, and because
-  // it's what decides whether a frame renders as an image or a video.
   contentType: string;
-  // Videos only. Null for photos, and also null for a video whose metadata the
-  // browser never delivered.
   durationSeconds: number | null;
   caption: string;
   contributorName: string;
@@ -78,6 +71,7 @@ export function newPhotoFields(input: {
   };
 }
 
+// Fills defaults for any field missing on an older or partial document.
 export function normalisePhoto(id: string, data: Partial<Photo>): Photo {
   return {
     id,
@@ -116,6 +110,7 @@ export function reactionCounts(photo: Photo): Record<ReactionEmoji, number> {
   return counts;
 }
 
+// True when the upload is a video rather than a still.
 export function isVideo(photo: Photo): boolean {
   return photo.contentType.startsWith("video/");
 }

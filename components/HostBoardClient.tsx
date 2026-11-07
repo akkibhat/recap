@@ -45,13 +45,13 @@ type EndResult = {
 export function HostBoardClient({ boardId }: { boardId: string }) {
   const { data: board, loading } = useBoardById(boardId);
   const { data: photos } = usePhotos(boardId);
-  // Both read localStorage, unavailable during SSR - resolved at render
-  // time (null on the server, real value on the client's first render)
-  // rather than mirrored into state via an effect.
   const { user, loading: authLoading } = useAuth();
   const { data: account } = useUserAccount(user?.uid ?? null);
   const { data: deletedPhotos } = useDeletedPhotos(boardId);
   const [decisions, setDecisions] = useState<Record<string, DeletedDecision>>({});
+  // hostKey, guestId and guestName read localStorage, which doesn't exist
+  // during SSR - so they're resolved at render time (null on the server, the
+  // real value on the client's first render) rather than set by an effect.
   const [hostKey, setHostKey] = useState<string | null>(() =>
     typeof window !== "undefined" ? getHostKey(boardId) : null
   );
@@ -280,10 +280,9 @@ export function HostBoardClient({ boardId }: { boardId: string }) {
             </p>
           </div>
 
-          {/* Connection is a property of the signed-in account now, not of
-              this board - connect once and every board can archive. A host
-              who isn't signed in has nowhere to hang the grant, so they're
-              pointed at sign-in rather than shown a button that can't work. */}
+          {/* Connection belongs to the signed-in account, not this board. A
+              host who isn't signed in on this device has nowhere to hang the
+              grant, so they're pointed at sign-in instead. */}
           {account?.googlePhotosConnected ? (
             <p className="text-sm text-bone-dim">
               Google Photos connected — you can archive there when you develop the roll.
@@ -313,9 +312,8 @@ export function HostBoardClient({ boardId }: { boardId: string }) {
       )}
 
       {/* Developing the roll ends the night and can permanently clear photos
-          out of Storage. It used to sit beside "Download all as zip" at equal
-          width and weight, which read as two interchangeable options. Its own
-          row, away from the panel, makes the asymmetry visible. */}
+          out of Storage, so it sits on its own row away from "Download all as
+          zip" rather than reading as an equal option beside it. */}
       {!board.endedAt && (
         <div className="flex flex-col items-center gap-1">
           <button onClick={openEndDialog} disabled={ending} className={buttonDangerClass}>
@@ -377,9 +375,9 @@ export function HostBoardClient({ boardId }: { boardId: string }) {
   );
 }
 
-// Replaces the old window.confirm(). A native confirm can't carry the archive
-// opt-in, and archiving is the one irreversible thing this app does - it
-// deserves a deliberate tick rather than being implied by having connected.
+// The "develop this roll?" confirm. A custom dialog rather than
+// window.confirm() because it carries the archive opt-in and the review of
+// removed photos; archiving is irreversible, so it needs a deliberate tick.
 function EndBoardDialog({
   deletedPhotos,
   decisions,
@@ -609,13 +607,9 @@ function EndedPanel({
   );
 }
 
-// What happens to photos removed during the night.
-//
-// Keep is the default for anything untouched, and purging always needs a
-// deliberate tap. The reverse - destroy unless told otherwise - was considered
-// and rejected: it inverts the point of soft delete, and this screen appears
-// exactly when a tired host is tapping through to be done. Wrongly keeping a
-// photo costs a few megabytes; wrongly destroying one is permanent.
+// What happens to photos removed during the night. Keep is the default for
+// anything untouched and purging always needs a deliberate tap (see
+// DEFAULT_DECISION in lib/deletedAlbum.ts for why).
 function DeletedReview({
   photos,
   decisions,

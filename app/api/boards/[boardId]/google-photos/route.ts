@@ -10,6 +10,7 @@ import { normaliseBoardSecret } from "@/lib/types/boardSecret";
 // arbitrary link to the party.
 const ALLOWED_SHARE_HOSTS = ["photos.app.goo.gl", "photos.google.com"];
 
+// True only for an https link on one of the allowed Google Photos hosts.
 function isValidShareUrl(value: string): boolean {
   try {
     const url = new URL(value);

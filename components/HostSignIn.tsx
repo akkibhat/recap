@@ -23,18 +23,15 @@ function signInMessage(err: unknown): string | null {
   return message || "Sign-in didn't complete.";
 }
 
-// Sign-in is offered, never required. A host can start a board without it and
-// everything works; what they give up is being able to get that board back on
-// another device or after clearing their browser. The copy says so rather than
-// nudging, because adding a login step to a party app needs to earn itself.
+// The host's sign-in control. Hosts need it to start a board; guests never do.
 // `variant="header"` is the compact version for the top bar of the home page:
-// a single "Sign in" (its optional nature goes in the tooltip), or "Your boards
-// · Sign out" once signed in.
+// a single "Sign in", or "Your boards · Sign out" once signed in.
 export function HostSignIn({ variant = "default" }: { variant?: "default" | "header" }) {
   const { user, loading } = useAuth();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Runs a sign-in or sign-out, turning any failure into a readable message.
   async function run(action: () => Promise<void>) {
     setBusy(true);
     setError(null);

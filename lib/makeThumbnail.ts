@@ -18,6 +18,7 @@ const VIDEO_TIMEOUT_MS = 10_000;
 export type Thumbnail = { blob: Blob; extension: string };
 export type MediaProbe = { thumbnail: Thumbnail | null; durationSeconds: number | null };
 
+// Draws a source onto a canvas no bigger than MAX_EDGE and encodes it as JPEG.
 function drawToThumbnail(
   source: CanvasImageSource,
   width: number,
@@ -45,6 +46,7 @@ function drawToThumbnail(
   );
 }
 
+// Makes a gallery-sized copy of a photo, or none if it's already small enough.
 async function probeImage(file: File): Promise<MediaProbe> {
   // imageOrientation matters: without it a photo carrying EXIF rotation
   // produces a thumbnail turned on its side relative to the original, so the

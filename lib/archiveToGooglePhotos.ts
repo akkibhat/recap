@@ -99,7 +99,7 @@ export async function archiveBoardToGooglePhotos(boardId: string): Promise<Archi
 
   // Anything already carrying a media item id reached the album on a previous
   // attempt. Re-sending would duplicate it, so a retry after a timeout resumes
-  // rather than starting over - which is what that field is finally for.
+  // rather than starting over.
   const pending = live.filter((photo) => !photo.googlePhotosMediaItemId);
   const skippedCount = live.length - pending.length;
   if (pending.length === 0) return nothingToDo(boardSecret.googlePhotosAlbumUrl, skippedCount);

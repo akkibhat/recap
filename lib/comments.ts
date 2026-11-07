@@ -4,6 +4,7 @@ import { addDoc, collection, doc, updateDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase/client";
 import { newCommentFields, MAX_COMMENT_LENGTH } from "@/lib/types/comment";
 
+// Posts a comment on a photo. Empty or whitespace-only bodies are dropped.
 export async function addComment(input: {
   boardId: string;
   photoId: string;

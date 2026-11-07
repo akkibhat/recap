@@ -1,9 +1,6 @@
-// Account-level state for a signed-in host, keyed by Firebase uid.
-//
-// Google Photos used to be connected per board: every party meant another
-// consent screen, and the refresh token lived in that board's boardSecrets.
-// It belongs to the Google account, not to one night, so it lives here and is
-// granted once.
+// Account-level state for a signed-in host, keyed by Firebase uid. The Google
+// Photos grant belongs to the Google account, not to one night, so it is
+// stored here and granted once.
 //
 // Split into two documents on the same uid, mirroring boards/boardSecrets:
 // this one is readable by its owner so the UI can show connection state live,
@@ -22,10 +19,12 @@ export type UserSecret = {
   deletedAlbumUrl: string | null;
 };
 
+// The starting state for a host who hasn't connected anything yet.
 export function newUserAccountFields(): UserAccount {
   return { googlePhotosConnected: false, googlePhotosConnectedAt: null };
 }
 
+// Fills defaults for any field missing on the users/{uid} document.
 export function normaliseUserAccount(data: Partial<UserAccount>): UserAccount {
   return {
     googlePhotosConnected: data.googlePhotosConnected ?? false,
@@ -33,6 +32,7 @@ export function normaliseUserAccount(data: Partial<UserAccount>): UserAccount {
   };
 }
 
+// Fills defaults for any field missing on the userSecrets/{uid} document.
 export function normaliseUserSecret(data: Partial<UserSecret>): UserSecret {
   return {
     googlePhotosRefreshToken: data.googlePhotosRefreshToken ?? null,

@@ -4,8 +4,7 @@ import Link from "next/link";
 // dot after it. The dot is the one bit of brand colour in the header, and it
 // reads as the "record" light on a camera.
 
-// The dot alone. Kept under the old name so existing imports still work;
-// used where a screen wants a small brand mark without the word.
+// The dot alone, for screens that want a small brand mark without the word.
 export function LogoMark({ size = 24 }: { size?: number }) {
   const d = Math.round(size * 0.42);
   return (

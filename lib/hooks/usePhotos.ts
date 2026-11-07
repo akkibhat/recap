@@ -20,6 +20,7 @@ function toRollPhoto(photo: Photo, index: number): RollPhoto {
   return { ...photo, frameNumber: `${String(index + 1).padStart(2, "0")}A` };
 }
 
+// The board's visible photos, live, oldest first, each with its frame number.
 export function usePhotos(boardId: string | null) {
   const q = useMemo(
     () =>
@@ -30,22 +31,16 @@ export function usePhotos(boardId: string | null) {
   );
   const result = useCollectionList<Photo>(q, normalisePhoto);
 
-  // Deleted photos are filtered here rather than in the query. Adding
-  // `where("deletedAt", "==", null)` would need a second composite index
-  // deployed before this code could run at all, and getting that ordering
-  // wrong takes the whole gallery down.
-  //
-  // The tradeoff is that a deleted photo's document still reaches the client,
-  // so this hides photos from the UI without hiding them from someone reading
-  // the network tab. That's proportionate for a friends-only board, but it is
-  // not redaction - if deletion ever needs to mean "unreachable", this has to
-  // move into the query and the index has to ship first.
+  // Deleted photos are filtered here rather than in the query, because
+  // `where("deletedAt", "==", null)` would need a composite index deployed
+  // before this code could run. The tradeoff: a deleted photo's document still
+  // reaches the client, so this hides it from the UI, not from the network
+  // tab. If deletion ever needs to mean "unreachable", move it into the query
+  // and ship the index first.
   return useMemo(
     () => ({
-      // Numbering happens BEFORE the filter, deliberately. Frame numbers are
-      // exposed onto real film and don't move, so deleting frame 3 must not
-      // renumber 4 into 3. Numbering the filtered list would do exactly that,
-      // and the whole strip would silently reshuffle mid-party.
+      // Number BEFORE filtering, so deleting frame 3 doesn't renumber 4 into 3
+      // and reshuffle every frame mid-party.
       data: result.data.map(toRollPhoto).filter(isVisible),
       loading: result.loading,
     }),

@@ -9,9 +9,9 @@ import { getGooglePhotosAuthUrl } from "@/lib/googlePhotos";
 // rather than accumulating.
 const STATE_TTL_MS = 15 * 60 * 1000;
 
-// Connecting Google Photos is now an account-level action, not a board-level
-// one, so this requires a signed-in identity rather than a board's host key.
-// Connect once and every board you run can archive.
+// Starts connecting Google Photos. It's an account-level grant, so this needs
+// a signed-in identity rather than a board's host key. Connect once and every
+// board you run can archive.
 export async function POST(req: NextRequest) {
   const header = req.headers.get("authorization");
   if (!header?.startsWith("Bearer ")) {

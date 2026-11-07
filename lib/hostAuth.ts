@@ -22,19 +22,16 @@ async function verifiedUid(req: NextRequest): Promise<string | null> {
   }
 }
 
-// Shared by every host-privileged API route, so the two ways of proving you're
-// the host (and their error responses) exist in one place.
+// Shared by every host-privileged API route. Either of two credentials is
+// accepted, deliberately:
 //
-// Two credentials are accepted, deliberately:
-//
-//  - The board's hostKey, from localStorage. The original model, and still the
-//    only one available to a host who never signed in. Dies with the browser.
+//  - The board's hostKey, from localStorage. Works without being signed in on
+//    this device, but dies with the browser.
 //  - A Google sign-in whose uid matches the board's ownerUid. Survives a
-//    cleared browser and a new phone, which is the entire reason it exists.
+//    cleared browser and a new phone.
 //
 // Boards created before sign-in existed have ownerUid === null, and no uid can
-// ever equal null, so they keep working on the hostKey alone rather than
-// locking their owners out.
+// ever equal null, so they keep working on the hostKey alone.
 export async function requireHostKey(req: NextRequest, boardId: string): Promise<HostAuthResult> {
   // Most routes are called via fetch() with a header. The export route is a
   // plain browser navigation (triggers a file download), which can't set

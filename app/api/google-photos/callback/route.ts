@@ -2,10 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebase/admin";
 import { exchangeCodeForTokens } from "@/lib/googlePhotos";
 
-// Completes the account-level Google Photos handshake. No album is created
-// here any more: albums are per board and named after it, so one gets made at
-// archive time instead. Connecting used to leave an empty album behind for
-// every board, whether or not anything was ever archived to it.
+// Completes the account-level Google Photos handshake and stores the refresh
+// token. No album is made here: albums are per board, created at archive time.
 export async function GET(req: NextRequest) {
   const code = req.nextUrl.searchParams.get("code");
   const state = req.nextUrl.searchParams.get("state");

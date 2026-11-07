@@ -17,10 +17,12 @@ export function getOrCreateGuestId(): string {
   return id;
 }
 
+// The name this guest put on their photos, or "" if they haven't set one.
 export function getGuestName(): string {
   return localStorage.getItem(GUEST_NAME_KEY) ?? "";
 }
 
+// Remembers the guest's name in this browser.
 export function setGuestName(name: string): void {
   localStorage.setItem(GUEST_NAME_KEY, name);
 }

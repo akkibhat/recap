@@ -1,12 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256">
   <!--
-    Favicon variant of the mark in components/Logo.tsx. Same geometry, but the
-    frame window is filled safelight instead of punched through.
-
-    In the app the logo is monochrome, because red there already means
-    "interactive or important" and a red logo would dilute it. A browser tab
-    strip has no such competition, and a mark with one spot of colour is far
-    easier to pick out of twenty tabs than a white-on-dark silhouette.
+    The favicon: a white film camera with a red window. It predates the
+    redesign, so it doesn't match the pink-dot mark in components/Logo.tsx.
 
     Colours are literal rather than currentColor: a favicon renders outside the
     page, so it inherits nothing.

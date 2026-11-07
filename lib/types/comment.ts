@@ -1,11 +1,8 @@
-// Lives at boards/{boardId}/comments/{commentId} - a subcollection, unlike
-// photos which are top-level with a boardId field.
-//
-// That's deliberate. A top-level collection can only be queried with a
-// where("boardId", "==", …) filter, and Firestore list rules can't inspect a
-// query's filters - so permitting the query at all permits listing every
-// comment on the project. Nesting under the board scopes the list by path
-// instead, and a caller has to know a board id to read anything.
+// Lives at boards/{boardId}/comments/{commentId}, nested under the board like
+// photos. A top-level collection would need a where("boardId", ...) filter,
+// and Firestore list rules can't inspect a query's filters, so allowing that
+// query would allow listing every comment on the project. Nesting scopes the
+// list by path: a caller has to know a board id to read anything.
 export type Comment = {
   id: string;
   photoId: string;
@@ -21,6 +18,7 @@ export type Comment = {
 
 export const MAX_COMMENT_LENGTH = 500;
 
+// The full document for a new comment, matching what the create rule expects.
 export function newCommentFields(input: {
   photoId: string;
   body: string;
@@ -38,6 +36,7 @@ export function newCommentFields(input: {
   };
 }
 
+// Fills defaults for any field missing on an older or partial document.
 export function normaliseComment(id: string, data: Partial<Comment>): Comment {
   return {
     id,
@@ -51,6 +50,7 @@ export function normaliseComment(id: string, data: Partial<Comment>): Comment {
   };
 }
 
+// False once a comment has been (soft) removed.
 export function isCommentVisible(comment: Comment): boolean {
   return comment.deletedAt === null;
 }

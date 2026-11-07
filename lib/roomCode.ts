@@ -4,4 +4,5 @@ import { customAlphabet } from "nanoid";
 // or when someone's calling the code out across a loud room.
 const ALPHABET = "23456789ABCDEFGHJKMNPQRSTUVWXYZ";
 
+// Returns a random five-character room code from that alphabet.
 export const generateRoomCode = customAlphabet(ALPHABET, 5);

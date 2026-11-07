@@ -6,6 +6,8 @@ import { applyDeletedReview, DeletedDecision, ReviewOutcome } from "@/lib/delete
 import { normalisePhoto, isVisible } from "@/lib/types/photo";
 import { normaliseBoard } from "@/lib/types/board";
 
+// Ends a board: optionally archives it to Google Photos, applies the host's
+// decisions about removed photos, then stamps endedAt.
 export async function POST(req: NextRequest, { params }: { params: Promise<{ boardId: string }> }) {
   const { boardId } = await params;
   const auth = await requireHostKey(req, boardId);
