@@ -26,8 +26,9 @@ export const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
 export const db = getFirestore(app);
 export const storage = getStorage(app);
 
-// Auth is for HOSTS ONLY. Guests never sign in; they stay on a localStorage
-// nanoid. Hosts sign in to start boards and to keep them across devices.
+// Hosts sign in with Google to start boards and keep them across devices.
+// Guests are signed in too, anonymously and without seeing it, so the rules
+// can tell them apart (see useGuestId).
 //
 // Persistence is pinned to localStorage rather than Firebase's default
 // IndexedDB. The IndexedDB layer closes its database when the tab reports

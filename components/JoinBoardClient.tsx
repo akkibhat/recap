@@ -3,8 +3,9 @@
 import { useState } from "react";
 import { useBoardByRoomCode } from "@/lib/hooks/useBoard";
 import { usePhotos } from "@/lib/hooks/usePhotos";
-import { getOrCreateGuestId, getGuestName, setGuestName } from "@/lib/guestIdentity";
+import { useGuestId, getGuestName, setGuestName } from "@/lib/guestIdentity";
 import { PhotoUploadForm } from "@/components/PhotoUploadForm";
+import { boardClosedReason, BOARD_OPEN_DAYS, MAX_PHOTOS_PER_BOARD } from "@/lib/types/board";
 import { PhotoGallery } from "@/components/PhotoGallery";
 import { LogoMark, Wordmark } from "@/components/Logo";
 import { inputClass, buttonPrimaryClass } from "@/components/ui";
@@ -13,17 +14,19 @@ import { inputClass, buttonPrimaryClass } from "@/components/ui";
 // states, the name prompt on first visit, then the board itself - header,
 // upload form and photo wall.
 export function JoinBoardClient({ roomCode }: { roomCode: string }) {
-  // localStorage isn't available during SSR, so these resolve to null/empty
-  // on the server and compute the real value on the client's first render -
-  // no effect needed for a value that's synchronous once you're in a browser.
-  const [guestId] = useState<string | null>(() =>
-    typeof window !== "undefined" ? getOrCreateGuestId() : null
-  );
+  // Null until the background anonymous sign-in lands (see useGuestId).
+  const { guestId, error: guestError } = useGuestId();
+  // localStorage isn't available during SSR, so this is empty on the server
+  // and reads the real value on the client's first render.
   const [guestName, setGuestNameState] = useState<string>(() =>
     typeof window !== "undefined" ? getGuestName() : ""
   );
   const { data: board, loading } = useBoardByRoomCode(roomCode);
   const { data: photos } = usePhotos(board?.id ?? null);
+
+  if (guestError) {
+    return <CentredMessage title="Can't join right now" detail={guestError} />;
+  }
 
   if (loading || !guestId) {
     return <CentredMessage title="Loading the roll…" />;
@@ -67,20 +70,38 @@ export function JoinBoardClient({ roomCode }: { roomCode: string }) {
     return <NamePrompt boardTitle={board.title} onSet={setGuestNameState} />;
   }
 
+  // "expired" or "full" here (an ended board returned above): the photos
+  // stay up, only new uploads stop.
+  const closedReason = boardClosedReason(board);
+
   return (
     <div className="mx-auto flex w-full max-w-5xl flex-1 flex-col gap-5 px-4 pt-3 pb-10">
       <BoardHeader roomCode={board.roomCode} />
       <div>
         <h1 className="text-[28px] leading-tight font-bold tracking-tight">{board.title}</h1>
-        <BoardSubline photos={photos} live />
+        <BoardSubline photos={photos} live={!closedReason} />
       </div>
       <div className="w-full max-w-xl">
-        <PhotoUploadForm boardId={board.id} guestId={guestId} guestName={guestName} />
+        {closedReason ? (
+          <UploadsClosedNote reason={closedReason} />
+        ) : (
+          <PhotoUploadForm boardId={board.id} guestId={guestId} guestName={guestName} />
+        )}
       </div>
       {/* No hostKey here: a guest can remove their own photo and nothing else. */}
       <PhotoGallery photos={photos} guestId={guestId} guestName={guestName} boardId={board.id} />
     </div>
   );
+}
+
+// Stands in for the upload form once a board stops taking photos.
+export function UploadsClosedNote({ reason }: { reason: "ended" | "expired" | "full" }) {
+  const text = {
+    ended: "This board has ended, so it isn't taking photos.",
+    expired: `Boards take photos for ${BOARD_OPEN_DAYS} days, and this one's time is up. Everything here stays.`,
+    full: `This board is full at ${MAX_PHOTOS_PER_BOARD} photos. Everything here stays.`,
+  }[reason];
+  return <p className="rounded-2xl bg-surface px-5 py-4 text-[15px] text-bone-dim">{text}</p>;
 }
 
 // The top bar of a board screen: the wordmark on the left, the room code as a
@@ -98,7 +119,7 @@ export function BoardHeader({ roomCode }: { roomCode: string }) {
 }
 
 // "8 photos from 5 people", worked out from the photos already on screen,
-// with a pink "live" while the board is still open.
+// with a pink "live" while the board is still taking photos.
 export function BoardSubline({ photos, live }: { photos: { contributorGuestId: string }[]; live: boolean }) {
   const people = new Set(photos.map((photo) => photo.contributorGuestId)).size;
   return (

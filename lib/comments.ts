@@ -26,9 +26,8 @@ export async function addComment(input: {
   );
 }
 
-// Soft, exactly like photo deletion, and for the same reason: authorGuestId is
-// a localStorage string, so "only your own" is a speed bump rather than a
-// boundary. Nothing a client does here destroys anything.
+// Soft, exactly like photo deletion: the rules only let the signed-in author
+// remove their own comment, and nothing a client does here destroys anything.
 //
 // The host's own moderation goes through the API route instead, which the
 // Admin SDK enforces properly.

@@ -4,9 +4,9 @@ import { emailAllowed, parseEmailList, readIdToken } from "@/lib/idToken";
 type HostAccessResult = { ok: true; uid: string; email: string } | { ok: false; response: NextResponse };
 
 // Who may START a board, as a comma-separated list of Google account emails in
-// RECAP_HOST_EMAILS. Recap is a personal tool: guests never sign in, but only
-// these accounts can create boards, so a stranger who finds the site can't run
-// up storage on it. When RECAP_HOST_EMAILS is unset it falls back to
+// RECAP_HOST_EMAILS. Guests are only ever signed in anonymously (no email),
+// and only these Google accounts can create boards, so a stranger who finds
+// the site can't run up storage on it. When RECAP_HOST_EMAILS is unset it falls back to
 // RECAP_ADMIN_EMAILS (the owner), and with neither set nobody can create a
 // board - it fails closed, never open.
 function allowedHostEmails(): string[] {

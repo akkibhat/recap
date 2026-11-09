@@ -13,7 +13,9 @@ export type AuthState = {
   loading: boolean;
 };
 
-// The signed-in Firebase user (hosts only), kept live as they sign in or out.
+// The signed-in host, kept live as they sign in or out. Guests are signed in
+// too, anonymously (see useGuestId), but they're never a host: an anonymous
+// user reads as nobody here, so the host UI never shows to a guest.
 export function useAuth(): AuthState {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
@@ -21,7 +23,7 @@ export function useAuth(): AuthState {
   useEffect(
     () =>
       onAuthStateChanged(auth, (next) => {
-        setUser(next);
+        setUser(next && !next.isAnonymous ? next : null);
         setLoading(false);
       }),
     []
@@ -45,5 +47,6 @@ export async function signOutHost(): Promise<void> {
 // normal state here rather than an error - a host who isn't signed in on this
 // device can still have the board's key in localStorage.
 export async function getIdToken(): Promise<string | null> {
-  return auth.currentUser ? auth.currentUser.getIdToken() : null;
+  const user = auth.currentUser;
+  return user && !user.isAnonymous ? user.getIdToken() : null;
 }

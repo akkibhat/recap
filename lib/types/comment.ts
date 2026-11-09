@@ -8,8 +8,8 @@ export type Comment = {
   photoId: string;
   body: string;
   authorName: string;
-  // Same localStorage nanoid that attributes photos and reactions. Spoofable,
-  // which is why deletion here is soft exactly as it is for photos.
+  // The author's Firebase Auth uid, the same id that attributes photos and
+  // reactions. The rules require it to match the signed-in user.
   authorGuestId: string;
   createdAt: number;
   deletedAt: number | null;

@@ -3,13 +3,25 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
+    function boardPath(boardId) {
+      return /databases/$(database)/documents/boards/$(boardId);
+    }
+
     // A guest write (photo, comment) is only accepted into a board that
-    // really exists and hasn't been ended. Without this, anyone holding the
-    // project's public web config could write into any made-up board id.
-    // Costs one document read per write.
+    // really exists, hasn't been ended, and is less than 7 days old (the
+    // same BOARD_OPEN_DAYS as lib/types/board.ts). Without this, anyone
+    // holding the project's public web config could write into any made-up
+    // board id. createdAt is epoch milliseconds. Costs one document read.
     function boardIsOpen(boardId) {
-      return exists(/databases/$(database)/documents/boards/$(boardId))
-          && get(/databases/$(database)/documents/boards/$(boardId)).data.endedAt == null;
+      return exists(boardPath(boardId))
+          && get(boardPath(boardId)).data.endedAt == null
+          && request.time.toMillis() < get(boardPath(boardId)).data.createdAt + 7 * 24 * 60 * 60 * 1000;
+    }
+
+    // Every guest is signed in (anonymously, or with Google for the host),
+    // and that uid is the only id a guest can act as. See useGuestId.
+    function isGuest(id) {
+      return request.auth != null && request.auth.uid == id;
     }
 
     // Created and ended only via server API routes using the Admin SDK, which
@@ -28,7 +40,18 @@ service cloud.firestore {
       // boards" page does, and all it can do.
       allow list: if request.auth != null && resource.data.ownerUid == request.auth.uid;
 
-      allow write: if false;
+      // Created and ended only through the Admin SDK. The one client write is
+      // the upload counter, and only like this: up by exactly one, naming a
+      // photo that doesn't exist yet but will once the same batch lands. So
+      // the count can't be pushed up without real uploads (which would close
+      // someone else's board early), and nothing else on a board changes.
+      allow update: if request.auth != null
+                    && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['photoCount', 'lastPhotoId'])
+                    && request.resource.data.photoCount == resource.data.get('photoCount', 0) + 1
+                    && request.resource.data.lastPhotoId is string
+                    && !exists(/databases/$(database)/documents/boards/$(boardId)/photos/$(request.resource.data.lastPhotoId))
+                    && existsAfter(/databases/$(database)/documents/boards/$(boardId)/photos/$(request.resource.data.lastPhotoId));
+      allow create, delete: if false;
 
       // Photos and comments live UNDER their board, not in top-level
       // collections with a boardId field. List rules can't inspect a query's
@@ -39,12 +62,17 @@ service cloud.firestore {
       match /photos/{photoId} {
         allow read: if true;
 
-        // Guests never log in, so there's no auth check - anyone who knows a
-        // boardId can add a photo to an open board, the same trust model as
-        // knowing the room code. The shape is validated so a malformed write
-        // can't corrupt what every other guest reads. There's no boardId
-        // field: the path is the only record of which board a photo is on.
+        // A signed-in guest adds a photo to an open board under their own
+        // uid. It must arrive in the same batch as the board's counter going
+        // up by one to this photo's id, and that count must stay within the
+        // 500-photo cap (MAX_PHOTOS_PER_BOARD). The shape is validated so a
+        // malformed write can't corrupt what every other guest reads. There's
+        // no boardId field: the path is the only record of the board.
         allow create: if boardIsOpen(boardId)
+                      && isGuest(request.resource.data.contributorGuestId)
+                      && getAfter(boardPath(boardId)).data.photoCount == get(boardPath(boardId)).data.get('photoCount', 0) + 1
+                      && getAfter(boardPath(boardId)).data.photoCount <= 500
+                      && getAfter(boardPath(boardId)).data.lastPhotoId == photoId
                       && request.resource.data.keys().hasAll(
                           ['storagePath', 'downloadUrl', 'contentType', 'caption',
                            'contributorName', 'contributorGuestId', 'uploadedAt', 'reactedBy']
@@ -57,32 +85,35 @@ service cloud.firestore {
                       && request.resource.data.contributorName.size() <= 40
                       && request.resource.data.reactedBy == {};
 
-        // Guests have no real identity, just a localStorage id, so none of
-        // these clauses can verify WHO is writing - only which fields change.
-        //   1. Reactions: reactedBy is the only field touched.
-        //   2. Caption edit: shape and length only. Unlike a delete, an edit
-        //      overwrites the old text and can't be undone.
-        //   3. Soft delete by a guest: deletedBy must equal the recorded
-        //      contributor. Both are spoofable ids, so this is a speed bump;
-        //      it's safe only because the write hides a photo, never destroys
-        //      it. Host moderation goes through the Admin SDK instead.
-        //   4. Undo: only when the contributor removed it themselves, so a
-        //      guest can't reverse a host removal (deletedBy 'host').
-        allow update: if request.resource.data.diff(resource.data).affectedKeys().hasOnly(['reactedBy'])
+        // Every clause checks the signed-in uid, so a guest only ever acts
+        // as themselves:
+        //   1. Reactions: only their own entry in reactedBy changes.
+        //   2. Caption edit: only on their own photo, with a length cap.
+        //   3. Soft delete: only their own photo, and deletedBy is them.
+        //      Host moderation goes through the Admin SDK instead.
+        //   4. Undo: only a removal they made themselves, so a guest can't
+        //      reverse a host removal (deletedBy 'host').
+        allow update: if (
+                           request.resource.data.diff(resource.data).affectedKeys().hasOnly(['reactedBy'])
+                           && request.auth != null
+                           && request.resource.data.reactedBy.diff(resource.data.reactedBy).affectedKeys().hasOnly([request.auth.uid])
+                         )
                       || (
                            request.resource.data.diff(resource.data).affectedKeys().hasOnly(['caption'])
+                           && isGuest(resource.data.contributorGuestId)
                            && request.resource.data.caption is string
                            && request.resource.data.caption.size() <= 280
                          )
                       || (
                            request.resource.data.diff(resource.data).affectedKeys().hasOnly(['deletedAt', 'deletedBy'])
+                           && isGuest(resource.data.contributorGuestId)
                            && request.resource.data.deletedAt is number
-                           && request.resource.data.deletedBy == resource.data.contributorGuestId
+                           && request.resource.data.deletedBy == request.auth.uid
                          )
                       || (
                            request.resource.data.diff(resource.data).affectedKeys().hasOnly(['deletedAt', 'deletedBy'])
+                           && isGuest(resource.data.deletedBy)
                            && request.resource.data.deletedAt == null
-                           && resource.data.deletedBy == resource.data.contributorGuestId
                          );
 
         // Never a hard delete from a client. Restoring, and any eventual
@@ -93,9 +124,11 @@ service cloud.firestore {
       match /comments/{commentId} {
         allow read: if true;
 
-        // Same trust model as uploading a photo - no auth - but the shape is
-        // validated so a malformed write can't corrupt what everyone reads.
+        // Same as a photo: a signed-in guest, posting under their own uid,
+        // into an open board. The shape is validated so a malformed write
+        // can't corrupt what everyone reads.
         allow create: if boardIsOpen(boardId)
+                      && isGuest(request.resource.data.authorGuestId)
                       && request.resource.data.keys().hasAll(
                           ['photoId', 'body', 'authorName', 'authorGuestId',
                            'createdAt', 'deletedAt', 'deletedBy']
@@ -116,13 +149,14 @@ service cloud.firestore {
         // which no authorGuestId equals, so a client can't reverse one.
         allow update: if (
                         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['deletedAt', 'deletedBy'])
+                        && isGuest(resource.data.authorGuestId)
                         && request.resource.data.deletedAt is number
-                        && request.resource.data.deletedBy == resource.data.authorGuestId
+                        && request.resource.data.deletedBy == request.auth.uid
                       )
                       || (
                         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['deletedAt', 'deletedBy'])
+                        && isGuest(resource.data.deletedBy)
                         && request.resource.data.deletedAt == null
-                        && resource.data.deletedBy == resource.data.authorGuestId
                       );
 
         allow delete: if false;

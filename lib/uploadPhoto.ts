@@ -2,7 +2,7 @@
 
 import { nanoid } from "nanoid";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
-import { addDoc, collection } from "firebase/firestore";
+import { collection, doc, increment, writeBatch } from "firebase/firestore";
 import { storage, db } from "@/lib/firebase/client";
 import { newPhotoFields } from "@/lib/types/photo";
 import { probeMedia } from "@/lib/makeThumbnail";
@@ -39,8 +39,14 @@ export async function uploadPhoto(input: {
     thumbUrl = await getDownloadURL(thumbRef);
   }
 
-  await addDoc(
-    collection(db, "boards", input.boardId, "photos"),
+  // The photo and the board's upload counter go in one batch, because the
+  // rules only accept each when they see the other: a photo needs the count
+  // to rise by exactly one (and stay within the cap), and the count may only
+  // rise alongside a new photo. Either both land or neither does.
+  const photoRef = doc(collection(db, "boards", input.boardId, "photos"));
+  const batch = writeBatch(db);
+  batch.set(
+    photoRef,
     newPhotoFields({
       storagePath,
       downloadUrl,
@@ -53,4 +59,9 @@ export async function uploadPhoto(input: {
       contributorGuestId: input.contributorGuestId,
     })
   );
+  batch.update(doc(db, "boards", input.boardId), {
+    photoCount: increment(1),
+    lastPhotoId: photoRef.id,
+  });
+  await batch.commit();
 }

@@ -3,10 +3,19 @@ rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
     // Guests upload directly from the browser (no server relay) into their
-    // board's own folder. Same trust model as the Firestore photos
-    // subcollection: no auth, but capped size/type so a stray upload can't
-    // blow through the free-tier storage allowance on its own.
-    //
+    // board's own folder. Same checks as the Firestore photos subcollection:
+    // a signed-in guest (anonymous or the host), an open board that's under
+    // 7 days old and under its 500-upload cap, and a size/type limit so a
+    // stray upload can't blow through the storage allowance on its own.
+    // One Firestore read: cross-service lookups are limited per request.
+    // A board id that doesn't exist makes the get fail, which denies.
+    function boardAcceptsUploads(boardId) {
+      let board = firestore.get(/databases/(default)/documents/boards/$(boardId)).data;
+      return board.endedAt == null
+          && request.time.toMillis() < board.createdAt + 7 * 24 * 60 * 60 * 1000
+          && board.get('photoCount', 0) < 500;
+    }
+
     // Videos get a larger cap than photos because they need one - a 30-second
     // 1080p clip off a phone is tens of megabytes, so the 15MB photo limit
     // would reject almost every real video. 50MB is the compromise: long
@@ -14,13 +23,13 @@ service firebase.storage {
     // the 5GB free tier isn't gone in a handful of uploads.
     match /boards/{boardId}/photos/{fileName} {
       allow read: if true;
-      // Only into a board that exists in Firestore and hasn't ended. This is
-      // what stops someone using the public web config to fill the bucket
-      // with files for made-up board ids, bypassing the site entirely.
+      // Only into a board that exists in Firestore and still takes uploads.
+      // This is what stops someone using the public web config to fill the
+      // bucket with files for made-up board ids, bypassing the site entirely.
       // (Cross-service rules: the Storage service agent needs read access to
       // Firestore; the Firebase CLI offers to grant it on first deploy.)
-      allow write: if firestore.exists(/databases/(default)/documents/boards/$(boardId))
-                   && firestore.get(/databases/(default)/documents/boards/$(boardId)).data.endedAt == null
+      allow write: if request.auth != null
+                   && boardAcceptsUploads(boardId)
                    && ((
                      request.resource.contentType.matches('image/.*')
                      && request.resource.size < 15 * 1024 * 1024

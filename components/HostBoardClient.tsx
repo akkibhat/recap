@@ -10,12 +10,13 @@ import { useAuth } from "@/lib/hooks/useAuth";
 import { useUserAccount } from "@/lib/hooks/useUserAccount";
 import { useDeletedPhotos } from "@/lib/hooks/useDeletedPhotos";
 import { galleryUrl, Photo } from "@/lib/types/photo";
-import { getOrCreateGuestId, getGuestName, setGuestName } from "@/lib/guestIdentity";
+import { useGuestId, getGuestName, setGuestName } from "@/lib/guestIdentity";
 import { postJson, getJson } from "@/lib/api";
 import { PhotoGallery } from "@/components/PhotoGallery";
 import { PhotoUploadForm } from "@/components/PhotoUploadForm";
 import { LogoMark } from "@/components/Logo";
-import { BoardHeader, BoardSubline } from "@/components/JoinBoardClient";
+import { BoardHeader, BoardSubline, UploadsClosedNote } from "@/components/JoinBoardClient";
+import { boardClosedReason } from "@/lib/types/board";
 import {
   inputClass,
   buttonPrimaryClass,
@@ -50,7 +51,7 @@ export function HostBoardClient({ boardId }: { boardId: string }) {
   const { data: account } = useUserAccount(user?.uid ?? null);
   const { data: deletedPhotos } = useDeletedPhotos(boardId);
   const [decisions, setDecisions] = useState<Record<string, DeletedDecision>>({});
-  // hostKey, guestId and guestName read localStorage, which doesn't exist
+  // hostKey and guestName read localStorage, which doesn't exist
   // during SSR - so they're resolved at render time (null on the server, the
   // real value on the client's first render) rather than set by an effect.
   const [hostKey, setHostKey] = useState<string | null>(() =>
@@ -60,9 +61,9 @@ export function HostBoardClient({ boardId }: { boardId: string }) {
   // recovering" is derived from it rather than stored, so the effect never
   // calls setState synchronously in its own body.
   const [recoveryFailed, setRecoveryFailed] = useState(false);
-  const [guestId] = useState<string | null>(() =>
-    typeof window !== "undefined" ? getOrCreateGuestId() : null
-  );
+  // The host's own uploads go in under their signed-in uid (Google, or
+  // anonymous on a device where they only hold the host key).
+  const { guestId } = useGuestId();
   const [guestName, setGuestNameState] = useState<string>(() =>
     typeof window !== "undefined" ? getGuestName() : ""
   );
@@ -231,7 +232,7 @@ export function HostBoardClient({ boardId }: { boardId: string }) {
           ← {user ? "Your boards" : "Home"}
         </Link>
         <h1 className="mt-2 text-[28px] leading-tight font-bold tracking-tight">{board.title}</h1>
-        <BoardSubline photos={photos} live={!board.endedAt} />
+        <BoardSubline photos={photos} live={!boardClosedReason(board)} />
       </div>
 
       {board.endedAt ? (
@@ -342,7 +343,13 @@ export function HostBoardClient({ boardId }: { boardId: string }) {
       )}
 
       {!board.endedAt &&
-        (guestName ? (
+        (boardClosedReason(board) ? (
+          // Past 7 days or at the photo cap: the rules refuse new uploads,
+          // the host's included, so say so instead of offering the form.
+          <div className="w-full max-w-xl">
+            <UploadsClosedNote reason={boardClosedReason(board)!} />
+          </div>
+        ) : guestName ? (
           <div className="w-full max-w-xl">
             <PhotoUploadForm boardId={boardId} guestId={guestId} guestName={guestName} />
           </div>

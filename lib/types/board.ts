@@ -22,7 +22,28 @@ export type Board = {
   // pastes the result. Public on purpose: this is the one album link that
   // actually opens for guests.
   googlePhotosShareUrl: string | null;
+  // Uploads so far, counting ones later removed. Guests bump it in the same
+  // batch as each photo, and the Firestore rules refuse the batch once it
+  // would pass MAX_PHOTOS_PER_BOARD. lastPhotoId is the photo that batch
+  // created: the rules use it to tie every +1 to a real new photo, so the
+  // counter can't be pushed up on its own to close someone's board.
+  photoCount: number;
+  lastPhotoId: string | null;
 };
+
+// Limits for a public board. Mirrored in firestore.rules and storage.rules,
+// which are what actually enforce them; these are for the UI.
+export const MAX_PHOTOS_PER_BOARD = 500;
+export const BOARD_OPEN_DAYS = 7;
+const BOARD_OPEN_MS = BOARD_OPEN_DAYS * 24 * 60 * 60 * 1000;
+
+// Why a board isn't taking photos, or null while it still is.
+export function boardClosedReason(board: Board, now = Date.now()): "ended" | "expired" | "full" | null {
+  if (board.endedAt) return "ended";
+  if (now >= board.createdAt + BOARD_OPEN_MS) return "expired";
+  if (board.photoCount >= MAX_PHOTOS_PER_BOARD) return "full";
+  return null;
+}
 
 // The full document for a brand-new board.
 export function newBoardFields(input: {
@@ -38,6 +59,8 @@ export function newBoardFields(input: {
     ownerUid: input.ownerUid,
     googlePhotosArchivedAt: null,
     googlePhotosShareUrl: null,
+    photoCount: 0,
+    lastPhotoId: null,
   };
 }
 
@@ -53,5 +76,7 @@ export function normaliseBoard(id: string, data: Partial<Board>): Board {
     ownerUid: data.ownerUid ?? null,
     googlePhotosArchivedAt: data.googlePhotosArchivedAt ?? null,
     googlePhotosShareUrl: data.googlePhotosShareUrl ?? null,
+    photoCount: data.photoCount ?? 0,
+    lastPhotoId: data.lastPhotoId ?? null,
   };
 }
