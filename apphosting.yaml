@@ -1,0 +1,52 @@
+# Firebase App Hosting config for recap.pi.co.nz. App Hosting builds and
+# deploys on every push to master, in asia-southeast1 (the nearest region it
+# offers to the Sydney Firestore). Server routes reach Firestore and Storage
+# through the backend's own service account, so no key file is needed.
+
+runConfig:
+  # Scales to zero between parties, and stays small during one: a board's
+  # photos and live gallery go straight from phones to Firebase, not through
+  # this server.
+  minInstances: 0
+  maxInstances: 2
+  concurrency: 80
+  cpu: 1
+  memoryMiB: 512
+
+env:
+  # The Firebase web config. Public by design: it ships in every visitor's
+  # browser, and the security rules are what protect the data.
+  - variable: NEXT_PUBLIC_FIREBASE_API_KEY
+    value: AIzaSyAakYeFTuVRDIyhTleHsDFXlYeWqIoSdNc
+  - variable: NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN
+    value: recap-party.firebaseapp.com
+  - variable: NEXT_PUBLIC_FIREBASE_PROJECT_ID
+    value: recap-party
+  - variable: NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET
+    value: recap-party.firebasestorage.app
+  - variable: NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID
+    value: "354421178282"
+  - variable: NEXT_PUBLIC_FIREBASE_APP_ID
+    value: 1:354421178282:web:40dcfc1e510f5b118535d3
+
+  # Google Photos. The client id is public (it appears in the sign-in URL);
+  # the secret lives in Secret Manager.
+  - variable: GOOGLE_OAUTH_CLIENT_ID
+    value: 354421178282-0i8ms6rom234j1qvjsobvmcv0qm60r8c.apps.googleusercontent.com
+    availability:
+      - RUNTIME
+  - variable: GOOGLE_OAUTH_REDIRECT_URI
+    value: https://recap.pi.co.nz/api/google-photos/callback
+    availability:
+      - RUNTIME
+  - variable: GOOGLE_OAUTH_CLIENT_SECRET
+    secret: recap-google-oauth-client-secret
+    availability:
+      - RUNTIME
+
+  # Who can see the admin page and start boards (RECAP_HOST_EMAILS falls
+  # back to this). Kept in Secret Manager so the address isn't in the repo.
+  - variable: RECAP_ADMIN_EMAILS
+    secret: recap-admin-emails
+    availability:
+      - RUNTIME

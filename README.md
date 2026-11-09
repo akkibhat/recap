@@ -19,7 +19,7 @@ or important, and the type is General Sans throughout.
 
 ## What it does
 
-- **Join in seconds**: a short room code or QR, then a name. Guests never sign in.
+- **Join in seconds**: a short room code or QR, then a name. No account, no app.
 - **Photos and video**: multi-upload with a caption per photo and an honest "3 of 10" counter.
   Thumbnails are made on the phone before upload (a 9.6 MB photo becomes a 446 KB preview), so
   the gallery stays fast on party wifi. Videos up to 50 MB get a poster frame and duration.
@@ -33,7 +33,12 @@ or important, and the type is General Sans throughout.
   or downloads it as a streamed zip.
 - **Hosts**: starting a board needs a Google sign-in on the host allow-list
   (`RECAP_HOST_EMAILS`), which also keeps your boards in one list and recovers a board's host key
-  on a new device. Guests never sign in. An admin page can list and fully delete boards.
+  on a new device. An admin page can list and fully delete boards.
+- **Guests can only be themselves**: each guest's browser is signed in to Firebase
+  anonymously in the background (they never see it), and the security rules check that
+  identity, so nobody can post, edit, remove or react as someone else.
+- **Limits**: a board takes up to 500 photos and stops taking new ones 7 days after it starts.
+  The photos stay up either way. Both limits are enforced in the Firestore and Storage rules.
 
 ## Built with
 
@@ -51,16 +56,20 @@ Google Photos Library API.
 
 Checks used throughout: `npx tsc --noEmit`, `npx eslint . --max-warnings=0`, `npx next build`.
 
+## Deploying
+
+Live at **recap.pi.co.nz** on Firebase App Hosting (project `recap-party`, region
+asia-southeast1). Pushing `master` builds and deploys it; the settings are in `apphosting.yaml`,
+and the two secrets it names live in Secret Manager. The security rules deploy separately:
+`npx firebase deploy --only firestore:rules,storage --project recap-party`.
+
 ## Status
 
-Working end to end, including a real Google Photos archive, but not public yet. Before it is:
+Working end to end, including a real Google Photos archive. Still open:
 
-- **Guest identity**: guests are identified by a random id in their browser. That's fine among
-  friends holding a room code, but proper guest auth should come before strangers can join.
-- **Limits**: only allow-listed hosts can create boards, and guest uploads and comments are only
-  accepted into boards that exist and are still open (enforced in the Firestore and Storage
-  rules). There's still no per-board cap, and boards don't expire.
 - **Real-device testing**: video poster frames and archiving video to Google Photos haven't
   been through a real phone yet.
 - **Sharing**: Google no longer lets apps share albums they created (since March 2025), so the
   host shares the finished album link by hand and pastes it back into the board.
+- **Hosts**: only allow-listed Google accounts can start boards. Opening that up would need
+  Google to review the app's Google Photos permission first.
